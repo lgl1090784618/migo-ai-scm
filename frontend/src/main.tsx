@@ -1,20 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, ArrowDownToLine, ArrowRight, Bell, Boxes, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Clipboard, Database, FileClock, FileJson, FolderOpen, GitBranch, KeyRound, LayoutDashboard, Link2, LoaderCircle, LogOut, Pause, Play, Plus, RefreshCw, Search, Settings2, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
+import { Activity, ArrowDownToLine, ArrowRight, Bell, Boxes, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Clipboard, Clock, Database, Factory, FileClock, FileJson, FolderOpen, GitBranch, HeartPulse, KeyRound, LayoutDashboard, Link2, LoaderCircle, LogOut, Pause, Play, Plug, Plus, RefreshCw, Repeat, Search, Settings2, ShieldCheck, SlidersHorizontal, Store, Truck, Warehouse, X } from 'lucide-react';
 import { api, date, listUrl, pretty, refreshCsrf, type Row } from './api';
 import './style.css';
 import { CollectionPanel } from './CollectionPanel';
+import { BusinessOverview, DataHealth, ModulePage, ScheduleBoard } from './insight';
 
-const nav = [
-  { id: 'overview', title: '运行概览', icon: LayoutDashboard },
-  { id: 'sources', title: '平台与连接', icon: Link2 },
-  { id: 'collections', title: '接口配置与试查', icon: Settings2 },
-  { id: 'datasets', title: '数据集与版本', icon: Database },
-  { id: 'batches', title: '接收批次', icon: ArrowDownToLine },
-  { id: 'jobs', title: '处理任务', icon: GitBranch },
-  { id: 'quarantine', title: '异常数据', icon: CircleAlert },
-  { id: 'audits', title: '审计日志', icon: FileClock },
+const navGroups = [
+  { label: '总览', items: [
+    { id: 'overview', title: '经营总览', icon: LayoutDashboard },
+    { id: 'sku', title: 'SKU 全链路', icon: GitBranch },
+    { id: 'replenish', title: '补货与预测', icon: Repeat },
+  ] },
+  { label: '业务模块', items: [
+    { id: 'market', title: '市场', icon: Activity },
+    { id: 'plan', title: '计划', icon: SlidersHorizontal },
+    { id: 'production', title: '生产', icon: Factory },
+    { id: 'logistics', title: '物流', icon: Truck },
+    { id: 'inventory', title: '库存', icon: Warehouse },
+    { id: 'sales', title: '销售', icon: Store },
+  ] },
+  { label: '数据管理', items: [
+    { id: 'scheduler', title: '调度中心', icon: Clock },
+    { id: 'health', title: '数据健康', icon: HeartPulse },
+    { id: 'sources', title: '数据接入', icon: Plug },
+    { id: 'collections', title: '接口配置与试查', icon: Settings2 },
+    { id: 'datasets', title: '数据集与版本', icon: Database },
+    { id: 'batches', title: '接收批次', icon: ArrowDownToLine },
+    { id: 'jobs', title: '处理任务', icon: GitBranch },
+    { id: 'quarantine', title: '异常数据', icon: CircleAlert },
+    { id: 'audits', title: '审计日志', icon: FileClock },
+  ] },
 ];
+const nav = navGroups.flatMap(g => g.items);
+const moduleIds = navGroups[1].items.map(n => n.id);
 const labels: Record<string, string> = { DRAFT: '待配置', ACTIVE: '已启用', PAUSED: '已暂停', PUBLISHED: '已发布', RECEIVED: '已接收', PENDING: '待处理', PROCESSING: '处理中', COMPLETED: '已完成', COMPLETED_WITH_ERRORS: '含异常', FAILED: '处理失败', RETRY: '等待重试', DONE: '已结束', APPLIED: '已整理', DUPLICATE: '重复已跳过', QUARANTINED: '已隔离' };
 const sourceTypes: Record<string, string> = { HTTP: 'HTTP API', MCP: 'MCP', FILE: '文件', AGENT: 'Agent / Skill' };
 const errorLabels: Record<string, string> = { SCHEMA_INVALID: '不符合数据结构', EVENT_ID_CONFLICT: '事件标识内容冲突', MAPPING_INVALID: '字段转换失败', RAW_STORAGE_UNAVAILABLE: '原料存储暂不可用', DATABASE_UNAVAILABLE: '数据库暂不可用', PROCESSING_ERROR: '处理异常' };
@@ -133,6 +152,6 @@ function App() {
   useEffect(() => { const fn = () => setPage(nav.some(n => n.id === location.hash.slice(1)) ? location.hash.slice(1) : 'overview'); window.addEventListener('hashchange', fn); return () => window.removeEventListener('hashchange', fn); }, []);
   const navigate = (id: string) => { location.hash = id; setPage(id); };
   if (booting) return <div className="boot"><Boxes size={30} /><span>正在连接工作台…</span></div>;
-  return <>{!user ? <Login onLogin={setUser} notify={notify} /> : <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand-mark"><Boxes size={24} /></div><div><strong>MOSSDOOM</strong><small>数据采集管理平台</small></div></div><div className="workspace"><span className="workspace-icon">M</span><div><strong>经营数据工作区</strong><small>MOSSDOOM / TEST</small></div><span className="workspace-label">测试</span></div><div className="nav-label">数据管理</div><nav>{nav.map(n => <button key={n.id} onClick={() => navigate(n.id)} className={page === n.id ? 'active' : ''}><n.icon size={19} /><span>{n.title}</span>{page === n.id && <span className="nav-active-dot" />}</button>)}</nav><div className="nav-label future-label">全链路经营</div><div className="future-module"><Boxes size={18} /><div>业务追踪工作台<small>业务口径确认后接入</small></div></div><a className="infra-link" href="https://192.168.10.154:8443/prometheus/" target="_blank" rel="noreferrer"><Activity size={17} />基础设施监控<ArrowRight size={14} /></a><div className="sidebar-footer"><ShieldCheck size={18} /><div><strong>源系统只读</strong><small>不执行新增、修改或删除</small></div></div></aside><div className="main-layout"><header className="topbar"><div><span className="breadcrumb">数据管理</span><ChevronRight size={14} /><span>{nav.find(n => n.id === page)?.title}</span></div><div className="topbar-right"><span className="environment">TEST</span><span className="timezone">Asia/Shanghai</span><span className="topbar-divider" /><div className="avatar">{user.username.slice(0, 1).toUpperCase()}</div><div className="user-info"><strong>{user.username}</strong><small>{user.role === 'ADMIN' ? '管理员' : '只读访问'}</small></div><button className="icon-button" title="退出登录" onClick={async () => { try { await api('/api/auth/logout', { json: {} }); await refreshCsrf(); setUser(null); } catch (e) { notify((e as Error).message, true); } }}><LogOut size={17} /></button></div></header><main className="content">{page === 'overview' ? <Overview navigate={navigate} notify={notify} /> : page === 'collections' ? (user.role === 'ADMIN' ? <CollectionPanel notify={notify} /> : <Empty title="需要管理员权限" text="接口配置及凭据管理仅向管理员开放。" />) : <Records key={page} type={page} admin={user.role === 'ADMIN'} notify={notify} onBatch={setBatch} />}<footer className="content-footer"><span>MOSSDOOM 数据采集管理平台 · 主体框架 0.1.0</span><span>测试数据与正式业务数据须独立管理</span></footer></main></div>{batch && <BatchDetail id={batch} onClose={() => setBatch(null)} admin={user.role === 'ADMIN'} notify={notify} />}</div>}{toast && <div role="status" className={`toast ${toast.error ? 'error' : ''}`}>{toast.error ? <CircleAlert size={18} /> : <CheckCircle2 size={18} />}<span>{toast.message}</span><button aria-label="关闭提示" onClick={() => setToast(null)}><X size={16} /></button></div>}</>;
+  return <>{!user ? <Login onLogin={setUser} notify={notify} /> : <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand-mark"><Boxes size={24} /></div><div><strong>MOSSDOOM</strong><small>AI 经营系统</small></div></div><div className="workspace"><span className="workspace-icon">M</span><div><strong>经营数据工作区</strong><small>MOSSDOOM / TEST</small></div><span className="workspace-label">测试</span></div>{navGroups.map(g => <div key={g.label}><div className="nav-label">{g.label}</div><nav>{g.items.map(n => <button key={n.id} onClick={() => navigate(n.id)} className={page === n.id ? 'active' : ''}><n.icon size={19} /><span>{n.title}</span>{page === n.id && <span className="nav-active-dot" />}</button>)}</nav></div>)}<div className="nav-label future-label">全链路经营</div><div className="future-module"><Boxes size={18} /><div>业务追踪工作台<small>业务口径确认后接入</small></div></div><a className="infra-link" href="https://192.168.10.154:8443/prometheus/" target="_blank" rel="noreferrer"><Activity size={17} />基础设施监控<ArrowRight size={14} /></a><div className="sidebar-footer"><ShieldCheck size={18} /><div><strong>源系统只读</strong><small>不执行新增、修改或删除</small></div></div></aside><div className="main-layout"><header className="topbar"><div><span className="breadcrumb">{navGroups.find(g => g.items.some(i => i.id === page))?.label || '总览'}</span><ChevronRight size={14} /><span>{nav.find(n => n.id === page)?.title}</span></div><div className="topbar-right"><span className="environment">TEST</span><span className="timezone">Asia/Shanghai</span><span className="topbar-divider" /><div className="avatar">{user.username.slice(0, 1).toUpperCase()}</div><div className="user-info"><strong>{user.username}</strong><small>{user.role === 'ADMIN' ? '管理员' : '只读访问'}</small></div><button className="icon-button" title="退出登录" onClick={async () => { try { await api('/api/auth/logout', { json: {} }); await refreshCsrf(); setUser(null); } catch (e) { notify((e as Error).message, true); } }}><LogOut size={17} /></button></div></header><main className="content">{page === 'overview' ? <BusinessOverview navigate={navigate} notify={notify} /> : page === 'health' ? <DataHealth notify={notify} /> : page === 'scheduler' ? <ScheduleBoard notify={notify} /> : moduleIds.includes(page) ? <ModulePage id={page} navigate={navigate} notify={notify} /> : page === 'collections' ? (user.role === 'ADMIN' ? <CollectionPanel notify={notify} /> : <Empty title="需要管理员权限" text="接口配置及凭据管理仅向管理员开放。" />) : <Records key={page} type={page} admin={user.role === 'ADMIN'} notify={notify} onBatch={setBatch} />}<footer className="content-footer"><span>MOSSDOOM 数据采集管理平台 · 主体框架 0.1.0</span><span>测试数据与正式业务数据须独立管理</span></footer></main></div>{batch && <BatchDetail id={batch} onClose={() => setBatch(null)} admin={user.role === 'ADMIN'} notify={notify} />}</div>}{toast && <div role="status" className={`toast ${toast.error ? 'error' : ''}`}>{toast.error ? <CircleAlert size={18} /> : <CheckCircle2 size={18} />}<span>{toast.message}</span><button aria-label="关闭提示" onClick={() => setToast(null)}><X size={16} /></button></div>}</>;
 }
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);

@@ -5,8 +5,8 @@ FE='E:/codex/data/tasks/MOSSDOOM经营系统/2026-11-09-全链路经营系统架
 KEY='E:/codex-private/credentials/mossdoom/test-154-automation'
 KNOWN='E:/codex-private/credentials/mossdoom-known-hosts'
 JAR='E:/codex/data/tasks/MOSSDOOM经营系统/2026-11-09-全链路经营系统架构/work/framework/backend-target/mossdoom-platform-0.1.0.jar'
-DOCKERFILE="$ROOT/deploy/Dockerfile"
-REFRESH="$ROOT/deploy/refresh-framework.sh"
+DOCKERFILE="E:/codex/project/MOSSDOOM经营系统/deploy/Dockerfile"
+REFRESH="E:/codex/project/MOSSDOOM经营系统/deploy/refresh-framework.sh"
 SSHOPTS="-i $KEY -o UserKnownHostsFile=$KNOWN -o StrictHostKeyChecking=yes"
 
 echo "=== 1. 前端构建 ==="
