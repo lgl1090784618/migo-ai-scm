@@ -1,0 +1,51 @@
+spring:
+  task:
+    scheduling:
+      pool:
+        size: 4
+  application:
+    name: mossdoom-platform
+  sql:
+    init:
+      mode: never
+  flyway:
+    enabled: false
+server:
+  port: 8080
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-stacktrace: never
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        name: MOSSSESSION
+        http-only: true
+        secure: true
+        same-site: strict
+  tomcat:
+    max-http-form-post-size: 6MB
+    threads:
+      max: 30
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+logging:
+  level:
+    root: INFO
+    cn.emigo.mossdoom: INFO
+    org.springframework.jdbc: WARN
+    org.flywaydb: INFO
+app:
+  environment: test
+  tenant: mossdoom
+  database-host: ${MOSS_DB_HOST:postgres}
+  s3-endpoint: ${MOSS_S3_ENDPOINT:http://objectstore:8333}
+  s3-bucket: ${MOSS_S3_BUCKET:moss-raw-test}
+  worker-enabled: ${MOSS_WORKER_ENABLED:true}

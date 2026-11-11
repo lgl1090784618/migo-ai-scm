@@ -1,0 +1,22 @@
+  app:
+    <<: *defaults
+    image: ${APP_IMAGE:?pin application image}
+    mem_limit: 1536m
+    cpus: 1.5
+    user: '10002:10002'
+    read_only: true
+    tmpfs: ['/tmp:size=128m,mode=1777']
+    environment:
+      TZ: UTC
+    volumes:
+      - /etc/mossdoom/secrets/pg_ingestion:/run/secrets/pg_ingestion:ro
+      - /etc/mossdoom/secrets/pg_business:/run/secrets/pg_business:ro
+      - /etc/mossdoom/secrets/app_admin_password:/run/secrets/app_admin:ro
+      - /etc/mossdoom/secrets/app_viewer_password:/run/secrets/app_viewer:ro
+      - /etc/mossdoom/secrets/s3-ingestion-client.json:/run/secrets/s3_client.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      objectstore:
+        condition: service_started
+    networks: [backend]

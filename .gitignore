@@ -1,0 +1,9 @@
+.env
+**/node_modules/
+**/target/
+**/dist/
+.idea/
+*.iml
+*.log
+*.key
+*.dpapi
