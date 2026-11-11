@@ -24,7 +24,8 @@ export function CollectionPanel({ notify }: { notify: (text: string, error?: boo
   };
   useEffect(() => {
     Promise.all([api('/api/sources?limit=100'), api('/api/collection/targets'), api('/api/collection/endpoints'), api('/api/datasets?limit=100')]).then(([s, t, e, d]) => {
-      setSources(s.items.filter((r: Row) => r.connector_type === 'HTTP' && r.mode === 'PULL' && r.environment === 'test'));
+      const selectable = s.items.filter((r: Row) => r.connector_type === 'HTTP' && r.mode === 'PULL' && r.environment === 'test');
+      setSources(selectable); setSource(current => current || selectable[0]?.id || '');
       setDatasets(d.items); setTargets(t); setEndpoints(e); setTarget(t[0]?.origin || ''); setEndpoint(e[0]?.id || ''); setRequest(pretty(e[0]?.request_template || {}));
     }).catch(e => notify(e.message, true));
   }, []);

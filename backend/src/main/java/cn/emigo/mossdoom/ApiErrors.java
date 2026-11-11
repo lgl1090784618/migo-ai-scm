@@ -21,6 +21,7 @@ class ApiErrors {
     @ExceptionHandler(HttpMessageNotReadableException.class) ResponseEntity<?> invalidJson(){return response(400,"INVALID_JSON","JSON格式、嵌套层级或请求大小不符合要求");}
     @ExceptionHandler(DataAccessException.class) ResponseEntity<?> database(){return response(503,"STORAGE_UNAVAILABLE","数据存储暂不可用，请稍后重试");}
     @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class) ResponseEntity<?> invalidParameter(){return response(400,"INVALID_PARAMETER","请求参数格式不正确");}
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class) ResponseEntity<?> missingResource(){return response(404,"NOT_FOUND","请求的资源不存在");}
     @ExceptionHandler(ObjectStore.StoreUnavailable.class) ResponseEntity<?> objectStore(){return response(503,"RAW_STORAGE_UNAVAILABLE","原料存储暂不可用，请稍后重试");}
     @ExceptionHandler(Exception.class) ResponseEntity<?> other(Exception e){LOG.warn("request_failed id={} type={}",RequestContext.requestId(),e.getClass().getSimpleName());return response(500,"INTERNAL_ERROR","操作未完成，请凭请求编号查询处理记录");}
 }

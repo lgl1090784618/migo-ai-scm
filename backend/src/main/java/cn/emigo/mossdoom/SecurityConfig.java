@@ -36,7 +36,7 @@ class SecurityConfig {
     @Bean SecurityFilterChain security(HttpSecurity http,ClientTokenFilter clients,HttpSessionSecurityContextRepository contexts,CookieCsrfTokenRepository csrf)throws Exception{
         return http.securityContext(c->c.securityContextRepository(contexts))
             .csrf(c->c.csrfTokenRepository(csrf).csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()).ignoringRequestMatchers("/ingestion/v1/**"))
-            .authorizeHttpRequests(a->a.requestMatchers("/","/index.html","/assets/**","/favicon.ico","/api/auth/csrf","/api/auth/session","/api/auth/login","/actuator/health","/actuator/prometheus").permitAll()
+            .authorizeHttpRequests(a->a.requestMatchers("/","/index.html","/assets/**","/favicon.ico","/favicon.svg","/robots.txt","/api/auth/csrf","/api/auth/session","/api/auth/login","/actuator/health","/actuator/prometheus").permitAll()
                 .requestMatchers("/ingestion/v1/**").hasRole("INGESTOR").requestMatchers("/api/**").hasAnyRole("ADMIN","VIEWER").anyRequest().denyAll())
             .addFilterBefore(clients,UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(e->e.authenticationEntryPoint((req,res,ex)->jsonError(res,401,"请先登录或提供有效的采集身份"))
