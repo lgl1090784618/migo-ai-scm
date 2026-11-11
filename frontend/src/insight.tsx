@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, ArrowRight, Boxes, CheckCircle2, Clock, Database, FolderOpen, GitBranch, LoaderCircle, RefreshCw, Timer } from 'lucide-react';
 import { api, date, type Row } from './api';
+import { DashBoard, type DashCard } from './grid';
 import './insight.css';
 
 type Notice = (message: string, error?: boolean) => void;
@@ -54,45 +55,53 @@ export function BusinessOverview({ navigate, notify }: { navigate: (id: string) 
     { key: 'sales', title: '销售', icon: FolderOpen, value: '未接入', unit: '', note: '待接领星 / 平台订单与广告', to: 'sales' },
   ];
 
+  const batches = (data?.recentBatches as Row[]) || [];
+  const sources = (data?.sources as Row[]) || [];
+
+  const cards: DashCard[] = [
+    {
+      id: 'pipeline', title: '数据管道', h: 5, content: <div className="kpi-grid">
+        <Kpi label="已启用数据源" value={p?.sources?.active ?? '—'} unit={`/ ${p?.sources?.total ?? '—'}`} note="HTTP · 只读" />
+        <Kpi label="近 24 小时批次" value={p?.batches?.last24h ?? '—'} unit="批" note={`累计 ${p?.batches?.total ?? '—'} 批`} />
+        <Kpi label="定时采集计划" value={p?.schedules?.enabled ?? '—'} unit={`/ ${p?.schedules?.total ?? '—'}`} note="启用 / 已配置" tone={p?.schedules?.enabled ? 'ok' : 'warn'} />
+        <Kpi label="处理中任务" value={p?.jobs?.running ?? '—'} unit="个" note={`近 7 天失败 ${p?.jobs?.failed7d ?? 0} 次`} tone={p?.jobs?.failed7d ? 'warn' : undefined} />
+        <Kpi label="异常数据" value={p?.quarantined ?? '—'} unit="条" note="不静默清除" tone={p?.quarantined ? 'bad' : 'ok'} />
+        <Kpi label="数据集" value={p?.datasets?.active ?? '—'} unit={`/ ${p?.datasets?.total ?? '—'}`} note="已启用 / 总数" />
+      </div>
+    },
+    {
+      id: 'chain', title: '全局链路：市场 → 计划 → 生产 → 物流 → 库存 → 销售', h: 9, content: <>
+        <p className="dash-note">每段显示当前可用的真实观测行数；未接入段直接标注，不拿示例数字充数。</p>
+        <div className="chain-grid">
+          {segments.map(s => <button key={s.key} className={`chain-card tone-${s.value === '未接入' ? 'idle' : 'ok'}`} onClick={() => navigate(s.to)}>
+            <div className="chain-head"><s.icon size={16} /><span>{s.title}</span><i /></div>
+            <div className="chain-value">{s.value}{s.unit && <small>{s.unit}</small>}</div>
+            <div className="chain-note">{s.note}</div>
+          </button>)}
+        </div>
+      </>
+    },
+    {
+      id: 'batches', title: '最近接收批次', w: 6, h: 10, content: batches.length
+        ? <div className="table-scroll"><table><thead><tr><th>接收时间</th><th>来源</th><th>数据集</th><th>状态</th><th>事件数</th></tr></thead>
+          <tbody>{batches.map(b => <tr key={b.id}><td>{date(b.received_at)}</td><td>{b.source_name || '—'}</td><td><code>{b.dataset_code || '—'}</code></td><td><Badge text={stateText[b.status] || b.status} t={tone(b.status)} /></td><td>{b.event_count}</td></tr>)}</tbody></table></div>
+        : <p className="muted padded">暂无批次</p>
+    },
+    {
+      id: 'health', title: '数据源健康', w: 6, h: 10, content: <>
+        <p className="dash-note">落后小时按最近批次时间计算。<button className="text-link" onClick={() => navigate('health')}>查看全部 <ArrowRight size={13} /></button></p>
+        <div className="table-scroll"><table><thead><tr><th>来源</th><th>状态</th><th>数据截至</th><th>落后</th></tr></thead>
+          <tbody>{sources.slice(0, 6).map(s => <tr key={s.id}><td>{s.name}<small className="muted">{s.platform_name}</small></td>
+            <td><Badge text={stateText[s.state] || s.state} t={tone(s.state)} /></td><td>{date(s.lastBatchAt)}</td>
+            <td>{s.hoursBehind == null ? '—' : `${s.hoursBehind} 小时`}</td></tr>)}</tbody></table></div>
+      </>
+    },
+  ];
+
   return <>
     <Head title="经营总览" chip="OVERVIEW · 标准模板" onRefresh={load} busy={busy} />
     <div className="notice-line"><span>数据管道指标来自本地采集库（真实）；业务经营指标尚未接入，相关位置标注「待接入」，不使用示例数字。</span></div>
-
-    <div className="kpi-grid">
-      <Kpi label="已启用数据源" value={p?.sources?.active ?? '—'} unit={`/ ${p?.sources?.total ?? '—'}`} note="HTTP · 只读" />
-      <Kpi label="近 24 小时批次" value={p?.batches?.last24h ?? '—'} unit="批" note={`累计 ${p?.batches?.total ?? '—'} 批`} />
-      <Kpi label="定时采集计划" value={p?.schedules?.enabled ?? '—'} unit={`/ ${p?.schedules?.total ?? '—'}`} note="启用 / 已配置" tone={p?.schedules?.enabled ? 'ok' : 'warn'} />
-      <Kpi label="处理中任务" value={p?.jobs?.running ?? '—'} unit="个" note={`近 7 天失败 ${p?.jobs?.failed7d ?? 0} 次`} tone={p?.jobs?.failed7d ? 'warn' : undefined} />
-      <Kpi label="异常数据" value={p?.quarantined ?? '—'} unit="条" note="不静默清除" tone={p?.quarantined ? 'bad' : 'ok'} />
-      <Kpi label="数据集" value={p?.datasets?.active ?? '—'} unit={`/ ${p?.datasets?.total ?? '—'}`} note="已启用 / 总数" />
-    </div>
-
-    <section className="panel">
-      <div className="panel-heading"><div><h2>全局链路：市场 → 计划 → 生产 → 物流 → 库存 → 销售</h2><small>每段显示当前可用的真实观测行数；未接入段直接标注，避免用示例数字充数。</small></div></div>
-      <div className="chain-grid">
-        {segments.map(s => <button key={s.key} className={`chain-card tone-${s.value === '未接入' ? 'idle' : 'ok'}`} onClick={() => navigate(s.to)}>
-          <div className="chain-head"><s.icon size={16} /><span>{s.title}</span><i /></div>
-          <div className="chain-value">{s.value}{s.unit && <small>{s.unit}</small>}</div>
-          <div className="chain-note">{s.note}</div>
-        </button>)}
-      </div>
-    </section>
-
-    <div className="two-col">
-      <section className="panel">
-        <div className="panel-heading"><div><h2>最近接收批次</h2><small>按接收时间倒序</small></div></div>
-        {(data?.recentBatches as Row[] || []).length ? <div className="table-scroll"><table><thead><tr><th>接收时间</th><th>来源</th><th>数据集</th><th>状态</th><th>事件数</th></tr></thead>
-          <tbody>{(data!.recentBatches as Row[]).map(b => <tr key={b.id}><td>{date(b.received_at)}</td><td>{b.source_name || '—'}</td><td><code>{b.dataset_code || '—'}</code></td><td><Badge text={stateText[b.status] || b.status} t={tone(b.status)} /></td><td>{b.event_count}</td></tr>)}</tbody></table></div>
-          : <p className="muted padded">暂无批次</p>}
-      </section>
-      <section className="panel">
-        <div className="panel-heading"><div><h2>数据源健康</h2><small>落后小时按最近批次时间计算</small></div><button className="text-link" onClick={() => navigate('health')}>全部 <ArrowRight size={14} /></button></div>
-        <div className="table-scroll"><table><thead><tr><th>来源</th><th>状态</th><th>数据截至</th><th>落后</th></tr></thead>
-          <tbody>{(data?.sources as Row[] || []).slice(0, 6).map(s => <tr key={s.id}><td>{s.name}<small className="muted">{s.platform_name}</small></td>
-            <td><Badge text={stateText[s.state] || s.state} t={tone(s.state)} /></td><td>{date(s.lastBatchAt)}</td>
-            <td>{s.hoursBehind == null ? '—' : `${s.hoursBehind} 小时`}</td></tr>)}</tbody></table></div>
-      </section>
-    </div>
+    <DashBoard page="overview" cards={cards} notify={notify} />
   </>;
 }
 
@@ -102,25 +111,31 @@ export function DataHealth({ notify }: { notify: Notice }) {
   const { data, busy, load } = useInsight('/api/insight/overview', notify);
   const sources = (data?.sources as Row[]) || [];
   const lag = (h: number | null) => h == null ? { t: 'bad', text: '从未接收' } : h > 24 ? { t: 'bad', text: `${h} 小时` } : h > 6 ? { t: 'warn', text: `${h} 小时` } : { t: 'ok', text: `${h} 小时` };
-  return <>
-    <Head title="数据健康" chip="DATA HEALTH · 标准模板" onRefresh={load} busy={busy} />
-    <div className="notice-line"><span>只统计本地采集库中的接收批次与定时任务，不向源平台发请求。</span></div>
-    <div className="kpi-grid">
-      <Kpi label="数据源总数" value={sources.length} unit="个" />
-      <Kpi label="正常" value={sources.filter(s => s.hoursBehind != null && s.hoursBehind <= 24).length} unit="个" tone="ok" />
-      <Kpi label="需要关注" value={sources.filter(s => s.hoursBehind == null || s.hoursBehind > 24).length} unit="个" tone="warn" />
-      <Kpi label="近 24 小时批次" value={data?.pipeline?.batches?.last24h ?? '—'} unit="批" />
-    </div>
-    <section className="panel">
-      <div className="panel-heading"><div><h2>数据源健康</h2><small>「从未接收」表示该来源还没有成功落库的批次</small></div></div>
-      <div className="table-scroll"><table><thead><tr><th>数据源</th><th>平台</th><th>连接状态</th><th>数据截至</th><th>落后</th><th>近 24h 批次</th><th>定时任务</th><th>最近错误</th></tr></thead>
+
+  const cards: DashCard[] = [
+    {
+      id: 'kpi', title: '健康概览', h: 4, content: <div className="kpi-grid">
+        <Kpi label="数据源总数" value={sources.length} unit="个" />
+        <Kpi label="正常" value={sources.filter(s => s.hoursBehind != null && s.hoursBehind <= 24).length} unit="个" tone="ok" />
+        <Kpi label="需要关注" value={sources.filter(s => s.hoursBehind == null || s.hoursBehind > 24).length} unit="个" tone="warn" />
+        <Kpi label="近 24 小时批次" value={data?.pipeline?.batches?.last24h ?? '—'} unit="批" />
+      </div>
+    },
+    {
+      id: 'sources', title: '数据源健康', h: 14, content: <div className="table-scroll"><table><thead><tr><th>数据源</th><th>平台</th><th>连接状态</th><th>数据截至</th><th>落后</th><th>近 24h 批次</th><th>定时任务</th><th>最近错误</th></tr></thead>
         <tbody>{sources.map(s => { const l = lag(s.hoursBehind as number | null); return <tr key={s.id}>
           <td>{s.name}</td><td>{s.platform_name}<small className="muted">{s.platform_code}</small></td>
           <td><Badge text={stateText[s.state] || s.state} t={tone(s.state)} /></td>
           <td>{date(s.lastBatchAt)}</td><td><Badge text={l.text} t={l.t} /></td><td>{s.cnt24 ?? 0}</td>
           <td>{s.schedule_enabled ? <Badge text={`每 ${Math.round((s.interval_seconds || 0) / 60)} 分钟`} t="ok" /> : <Badge text="未启用" t="idle" />}</td>
           <td><code>{s.last_error || '—'}</code></td></tr>; })}</tbody></table></div>
-    </section>
+    },
+  ];
+
+  return <>
+    <Head title="数据健康" chip="DATA HEALTH · 标准模板" onRefresh={load} busy={busy} />
+    <div className="notice-line"><span>只统计本地采集库中的接收批次与定时任务，不向源平台发请求。</span></div>
+    <DashBoard page="health" cards={cards} notify={notify} />
   </>;
 }
 
@@ -130,30 +145,36 @@ export function ScheduleBoard({ notify }: { notify: Notice }) {
   const { data, busy, load } = useInsight('/api/insight/overview', notify);
   const sources = (data?.sources as Row[]) || [];
   const jobs = (data?.recentJobs as Row[]) || [];
-  return <>
-    <Head title="调度中心" chip="SCHEDULER · 标准模板" onRefresh={load} busy={busy} />
-    <div className="notice-line"><span>定时计划在「接口配置与试查」中按来源保存并启用；这里统一查看运行情况。</span></div>
-    <div className="kpi-grid">
-      <Kpi label="任务总数" value={(data?.pipeline?.schedules?.total as number) ?? '—'} unit="个" />
-      <Kpi label="已启用" value={(data?.pipeline?.schedules?.enabled as number) ?? '—'} unit="个" tone={data?.pipeline?.schedules?.enabled ? 'ok' : 'warn'} />
-      <Kpi label="处理中" value={data?.pipeline?.jobs?.running ?? '—'} unit="个" />
-      <Kpi label="近 7 天失败" value={data?.pipeline?.jobs?.failed7d ?? '—'} unit="次" tone={data?.pipeline?.jobs?.failed7d ? 'warn' : 'ok'} />
-    </div>
-    <section className="panel">
-      <div className="panel-heading"><div><h2>定时采集计划</h2><small>每个来源最多一条计划</small></div></div>
-      <div className="table-scroll"><table><thead><tr><th>来源</th><th>平台</th><th>状态</th><th>间隔</th><th>下次运行</th><th>近 24h 批次</th></tr></thead>
+
+  const cards: DashCard[] = [
+    {
+      id: 'kpi', title: '调度概览', h: 4, content: <div className="kpi-grid">
+        <Kpi label="任务总数" value={(data?.pipeline?.schedules?.total as number) ?? '—'} unit="个" />
+        <Kpi label="已启用" value={(data?.pipeline?.schedules?.enabled as number) ?? '—'} unit="个" tone={data?.pipeline?.schedules?.enabled ? 'ok' : 'warn'} />
+        <Kpi label="处理中" value={data?.pipeline?.jobs?.running ?? '—'} unit="个" />
+        <Kpi label="近 7 天失败" value={data?.pipeline?.jobs?.failed7d ?? '—'} unit="次" tone={data?.pipeline?.jobs?.failed7d ? 'warn' : 'ok'} />
+      </div>
+    },
+    {
+      id: 'schedules', title: '定时采集计划', w: 6, h: 11, content: <div className="table-scroll"><table><thead><tr><th>来源</th><th>平台</th><th>状态</th><th>间隔</th><th>下次运行</th><th>近 24h 批次</th></tr></thead>
         <tbody>{sources.map(s => <tr key={s.id}><td>{s.name}</td><td>{s.platform_name}</td>
           <td>{s.schedule_enabled ? <Badge text="已启用" t="ok" /> : <Badge text="未启用" t="idle" />}</td>
           <td>{s.interval_seconds ? `${Math.round(s.interval_seconds / 60)} 分钟` : '—'}</td>
           <td>{date(s.next_run_at)}</td><td>{s.cnt24 ?? 0}</td></tr>)}</tbody></table></div>
-    </section>
-    <section className="panel">
-      <div className="panel-heading"><div><h2>最近采集任务</h2><small>本地任务状态机</small></div></div>
-      {jobs.length ? <div className="table-scroll"><table><thead><tr><th>创建时间</th><th>来源</th><th>数据集</th><th>状态</th><th>页数</th><th>记录数</th><th>错误</th></tr></thead>
-        <tbody>{jobs.map(j => <tr key={j.id}><td>{date(j.created_at)}</td><td>{j.source_name}</td><td><code>{j.dataset_code}</code></td>
-          <td><Badge text={stateText[j.state] || j.state} t={tone(j.state)} /></td><td>{j.pages_done}</td><td>{j.record_count}</td><td><code>{j.error_code || '—'}</code></td></tr>)}</tbody></table></div>
-        : <p className="muted padded">还没有采集任务。启用定时计划或手动执行一轮后出现在这里。</p>}
-    </section>
+    },
+    {
+      id: 'jobs', title: '最近采集任务', w: 6, h: 11, content: jobs.length
+        ? <div className="table-scroll"><table><thead><tr><th>创建时间</th><th>来源</th><th>数据集</th><th>状态</th><th>页数</th><th>记录数</th><th>错误</th></tr></thead>
+          <tbody>{jobs.map(j => <tr key={j.id}><td>{date(j.created_at)}</td><td>{j.source_name}</td><td><code>{j.dataset_code}</code></td>
+            <td><Badge text={stateText[j.state] || j.state} t={tone(j.state)} /></td><td>{j.pages_done}</td><td>{j.record_count}</td><td><code>{j.error_code || '—'}</code></td></tr>)}</tbody></table></div>
+        : <p className="muted padded">还没有采集任务。启用定时计划或手动执行一轮后出现在这里。</p>
+    },
+  ];
+
+  return <>
+    <Head title="调度中心" chip="SCHEDULER · 标准模板" onRefresh={load} busy={busy} />
+    <div className="notice-line"><span>定时计划在「接口配置与试查」中按来源保存并启用；这里统一查看运行情况。</span></div>
+    <DashBoard page="scheduler" cards={cards} notify={notify} />
   </>;
 }
 
@@ -179,23 +200,25 @@ export function ModulePage({ id, navigate, notify }: { id: string, navigate: (id
     if (id === 'inventory') return d.platform_code === 'migo-wms';
     return false;
   });
+
+  const cards: DashCard[] = [
+    {
+      id: 'coverage', title: '当前数据覆盖', w: 7, h: 11, content: datasets.length
+        ? <div className="table-scroll"><table><thead><tr><th>数据集</th><th>平台</th><th>粒度</th><th>状态</th><th>观测行</th><th>最近接收</th></tr></thead>
+          <tbody>{datasets.map(d => <tr key={d.code}><td><code>{d.code}</code><small className="muted">{d.name}</small></td><td>{d.platform_name}</td><td>{d.grain}</td>
+            <td><Badge text={stateText[d.state] || d.state} t={tone(d.state)} /></td><td>{d.events}</td><td>{date(d.last_received_at)}</td></tr>)}</tbody></table></div>
+        : <p className="muted padded">本模块尚未登记任何数据集。</p>
+    },
+    {
+      id: 'todo', title: '还缺什么', w: 5, h: 11, content: <div className="padded"><p><strong>所需数据：</strong>{copy.need}</p><p><strong>归属：</strong>{copy.owner}</p>
+        <p className="muted">数据源登记 → 接口配置与试查 → 发布数据集 → 启用定时计划，四个步骤走完即可在该模块看到真实数据。</p>
+        <button className="button" onClick={() => navigate('sources')}>去登记数据源 <ArrowRight size={15} /></button></div>
+    },
+  ];
+
   return <>
     <Head title={copy.title} chip={`${copy.title.toUpperCase()} · 标准模板`} onRefresh={() => { }} busy={false} />
     <div className="notice-line"><span>该模块的界面与指标口径按同事系统对齐中；下方是本项目当前真实的数据覆盖情况，未接入的部分不做示例填充。</span></div>
-    <div className="two-col">
-      <section className="panel">
-        <div className="panel-heading"><div><h2>当前数据覆盖</h2><small>来自本地采集库</small></div></div>
-        {datasets.length ? <div className="table-scroll"><table><thead><tr><th>数据集</th><th>平台</th><th>粒度</th><th>状态</th><th>观测行</th><th>最近接收</th></tr></thead>
-          <tbody>{datasets.map(d => <tr key={d.code}><td><code>{d.code}</code><small className="muted">{d.name}</small></td><td>{d.platform_name}</td><td>{d.grain}</td>
-            <td><Badge text={stateText[d.state] || d.state} t={tone(d.state)} /></td><td>{d.events}</td><td>{date(d.last_received_at)}</td></tr>)}</tbody></table></div>
-          : <p className="muted padded">本模块尚未登记任何数据集。</p>}
-      </section>
-      <section className="panel">
-        <div className="panel-heading"><div><h2>还缺什么</h2><small>按业务段列出必要数据源</small></div></div>
-        <div className="padded"><p><strong>所需数据：</strong>{copy.need}</p><p><strong>归属：</strong>{copy.owner}</p>
-          <p className="muted">数据源登记 → 接口配置与试查 → 发布数据集 → 启用定时计划，四个步骤走完即可在该模块看到真实数据。</p>
-          <button className="button" onClick={() => navigate('sources')}>去登记数据源 <ArrowRight size={15} /></button></div>
-      </section>
-    </div>
+    <DashBoard page={`module-${id}`} cards={cards} notify={notify} />
   </>;
 }
