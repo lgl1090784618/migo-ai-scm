@@ -181,7 +181,7 @@ export function SkuChainPage({ notify }: { notify: Notice }) {
           <div className="kpi"><div className="kpi-label">国内仓可用</div><div className="kpi-value">{fmt(data?.wmsUsable)}<small>件</small></div><div className="kpi-note">WMS 快照（较旧）</div></div>
           <div className="kpi"><div className="kpi-label">平台仓可用</div><div className="kpi-value">{fmt(data?.fbaUsable)}<small>件</small></div><div className="kpi-note">FBA 可售</div></div>
         </div>
-        <div className="notice-line">以款号为轴归并四段观测：生产单的货品编码、工厂库存的款号、WMS 与平台仓的 SKU 前缀都等于款号，所以不需要额外映射表。某一段没有数据时显示「未接入」，不显示 0。</div>
+        <div className="notice-line">以款号为轴归并四段观测：生产单的货品编码、工厂库存的款号、WMS 与平台仓的 SKU 前缀都等于款号，所以不需要额外映射表。某一段没有数据时显示「未接入」，不显示 0。品牌与部门取自 sell 主数据快照（2026-11-12），实时主数据源尚未接入。{data?.metaError ? `（主数据读取失败：${String(data.metaError)}）` : ''}</div>
       </>,
     },
     {
@@ -193,7 +193,10 @@ export function SkuChainPage({ notify }: { notify: Notice }) {
           const statuses = Object.entries((p.byStatus as Row) || {}).map(([k, v]) => `${k} ${fmt(v)}`).join(' · ');
           return <tr key={String(r.spu)}>
             <td><code>{String(r.spu)}</code></td>
-            <td title={String(r.goodsName || '')}>{String(r.goodsName || '—')}</td>
+            <td title={String(r.goodsName || r.category || r.categoryClass || '')}>
+              {String(r.goodsName || r.categoryClass || r.category || '—')}
+              <small className="muted">{[r.brand, r.dept, r.category].filter(Boolean).join(' · ') || '主数据待接入'}</small>
+            </td>
             <td className="stages">
               <Stage on={has(r, 'production')} text="生产" />
               <Stage on={has(r, 'factory')} text="工厂" />

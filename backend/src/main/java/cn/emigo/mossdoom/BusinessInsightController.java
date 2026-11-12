@@ -275,6 +275,7 @@ class BusinessInsightController {
             for (Map<String, Object> r : biz.queryForList("""
                 SELECT DISTINCT ON (payload->>'skuKey')
                        payload->>'skuKey' AS sku, payload->>'localSpuCode' AS spu,
+                       payload->>'brandName' AS brand, payload->>'teamName' AS team,
                        coalesce(nullif(payload->>'totalInventoryQty',''),'0')::numeric AS total,
                        coalesce(nullif(payload->>'usableInventoryQty',''),'0')::numeric AS usable,
                        coalesce(nullif(payload->>'occupyInventoryQty',''),'0')::numeric AS occupied,
@@ -284,6 +285,8 @@ class BusinessInsightController {
                 """, factory)) {
                 Map<String, Object> e = spu(spus, spuOf(r.get("spu"), r.get("sku")));
                 if (e == null) continue;
+                meta(e, "brand", r.get("brand"));
+                meta(e, "dept", r.get("team"));
                 Map<String, Object> f = section(e, "factory");
                 f.put("skus", num(f.get("skus")) + 1);
                 f.put("total", num(f.get("total")) + num(r.get("total")));
@@ -327,6 +330,7 @@ class BusinessInsightController {
             for (Map<String, Object> r : biz.queryForList("""
                 SELECT DISTINCT ON (payload->>'skuKey')
                        payload->>'skuKey' AS sku,
+                       payload->>'brandName' AS brand, payload->>'category2' AS category,
                        coalesce(nullif(payload->>'qtyTotal',''),'0')::numeric AS total,
                        coalesce(nullif(payload->>'qtyActive',''),'0')::numeric AS usable,
                        coalesce(nullif(payload->>'qtyFreeze',''),'0')::numeric AS frozen,
@@ -336,6 +340,8 @@ class BusinessInsightController {
                 """, wms)) {
                 Map<String, Object> e = spu(spus, spuOf(null, r.get("sku")));
                 if (e == null) continue;
+                meta(e, "brand", r.get("brand"));
+                meta(e, "category", r.get("category"));
                 Map<String, Object> w = section(e, "wms");
                 w.put("skus", num(w.get("skus")) + 1);
                 w.put("total", num(w.get("total")) + num(r.get("total")));
@@ -345,6 +351,22 @@ class BusinessInsightController {
                 if (updated != null && (w.get("asOf") == null || updated.compareTo(String.valueOf(w.get("asOf"))) > 0)) w.put("asOf", updated);
                 sku(e, str(r.get("sku")));
             }
+        }
+
+        // sell 主数据快照：品牌/部门/品类以主数据为准，覆盖源载荷里的同名字段（源载荷的 brandName 不一定等于品牌）
+        try {
+            for (Map<String, Object> m : biz.queryForList("SELECT spu, brand, dept, category, category_class, source FROM spu_meta")) {
+                Map<String, Object> e = spus.get(str(m.get("spu")));
+                if (e == null) continue;
+                if (str(m.get("brand")) != null) e.put("brand", str(m.get("brand")));
+                if (str(m.get("dept")) != null) e.put("dept", str(m.get("dept")));
+                if (str(m.get("category")) != null) e.put("category", str(m.get("category")));
+                if (str(m.get("category_class")) != null) e.put("categoryClass", str(m.get("category_class")));
+                if (str(m.get("source")) != null) e.put("metaSource", str(m.get("source")));
+            }
+        } catch (RuntimeException ex) {
+            // 主数据表缺失或无权读取时不影响链路本身，但把原因带回给页面，避免静默降级
+            out.put("metaError", ex.getClass().getSimpleName() + ": " + ex.getMessage());
         }
 
         List<Map<String, Object>> rows = new ArrayList<>(spus.values());
@@ -418,6 +440,14 @@ class BusinessInsightController {
     @SuppressWarnings("unchecked")
     private static void sku(Map<String, Object> entry, String code) {
         if (code != null) ((Set<String>) entry.get("skus")).add(code);
+    }
+
+    /** 只在字段还空着时写入：先到的数据优先（生产单 > 工厂仓 > 国内仓 > 平台仓的遍历顺序）。 */
+    private static void meta(Map<String, Object> entry, String key, Object value) {
+        String text = str(value);
+        if (text != null && !text.isBlank() && (entry.get(key) == null || String.valueOf(entry.get(key)).isBlank())) {
+            entry.put(key, text);
+        }
     }
 
     private static List<Map<String, Object>> flatten(Map<String, double[]> source) {
