@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, ArrowRight, Boxes, CheckCircle2, Clock, Database, FolderOpen, GitBranch, LoaderCircle, RefreshCw, Timer } from 'lucide-react';
 import { api, date, type Row } from './api';
 import { DashBoard, type DashCard } from './grid';
+import { ShareChart, TrendChart } from './chart';
 import './insight.css';
 
 type Notice = (message: string, error?: boolean) => void;
@@ -32,8 +33,11 @@ function Badge({ text, t }: { text: string, t?: string }) { return <span classNa
 export function BusinessOverview({ navigate, notify }: { navigate: (id: string) => void, notify: Notice }) {
   const { data, busy, load } = useInsight('/api/insight/overview', notify);
   const { data: cover } = useInsight('/api/insight/coverage', notify);
+  const { data: trend } = useInsight('/api/insight/trend?days=14', notify);
   const p = data?.pipeline as Row | undefined;
   const datasets = (cover?.datasets as Row[]) || [];
+  const trendPoints = ((trend?.days as Row[]) || []).map(d => ({ label: String(d.label), events: Number(d.events || 0), batches: Number(d.batches || 0) }));
+  const shareItems = ((trend?.bySource as Row[]) || []).map(d => ({ label: String(d.name || d.code), value: Number(d.events || 0) }));
   const byPlatform = useMemo(() => {
     const map: Record<string, { events: number, datasets: number, last: string | null }> = {};
     datasets.forEach(d => {
@@ -82,9 +86,15 @@ export function BusinessOverview({ navigate, notify }: { navigate: (id: string) 
       </>
     },
     {
+      id: 'trend', title: '采集趋势（近 14 天）', h: 7, content: <TrendChart points={trendPoints} />
+    },
+    {
+      id: 'share', title: '事件来源占比（近 30 天）', w: 6, h: 8, content: <ShareChart items={shareItems} unit="行" />
+    },
+    {
       id: 'batches', title: '最近接收批次', w: 6, h: 10, content: batches.length
         ? <div className="table-scroll"><table><thead><tr><th>接收时间</th><th>来源</th><th>数据集</th><th>状态</th><th>事件数</th></tr></thead>
-          <tbody>{batches.map(b => <tr key={b.id}><td>{date(b.received_at)}</td><td>{b.source_name || '—'}</td><td><code>{b.dataset_code || '—'}</code></td><td><Badge text={stateText[b.status] || b.status} t={tone(b.status)} /></td><td>{b.event_count}</td></tr>)}</tbody></table></div>
+          <tbody>{batches.map(b => <tr key={b.id}><td>{date(b.received_at)}</td><td>{b.source_name || '—'}</td><td><code title={b.dataset_code || '—'}>{b.dataset_code || '—'}</code></td><td><Badge text={stateText[b.status] || b.status} t={tone(b.status)} /></td><td>{b.event_count}</td></tr>)}</tbody></table></div>
         : <p className="muted padded">暂无批次</p>
     },
     {
@@ -165,7 +175,7 @@ export function ScheduleBoard({ notify }: { notify: Notice }) {
     {
       id: 'jobs', title: '最近采集任务', w: 6, h: 11, content: jobs.length
         ? <div className="table-scroll"><table><thead><tr><th>创建时间</th><th>来源</th><th>数据集</th><th>状态</th><th>页数</th><th>记录数</th><th>错误</th></tr></thead>
-          <tbody>{jobs.map(j => <tr key={j.id}><td>{date(j.created_at)}</td><td>{j.source_name}</td><td><code>{j.dataset_code}</code></td>
+          <tbody>{jobs.map(j => <tr key={j.id}><td>{date(j.created_at)}</td><td>{j.source_name}</td><td><code title={j.dataset_code}>{j.dataset_code}</code></td>
             <td><Badge text={stateText[j.state] || j.state} t={tone(j.state)} /></td><td>{j.pages_done}</td><td>{j.record_count}</td><td><code>{j.error_code || '—'}</code></td></tr>)}</tbody></table></div>
         : <p className="muted padded">还没有采集任务。启用定时计划或手动执行一轮后出现在这里。</p>
     },

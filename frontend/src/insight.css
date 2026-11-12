@@ -29,3 +29,5 @@
 .pill-idle{background:#f1f2f5;color:#5b6472}
 .table-scroll table td small.muted{display:block;font-size:11.5px;margin-top:2px}
 .padded{padding:18px}
+/* 长数据集编码在窄卡片里截断显示，悬停看全名 */
+.dash-card-body td code{display:inline-block;max-width:132px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}

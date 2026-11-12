@@ -42,19 +42,14 @@ function resolveDown(items: Item[], priorityId?: string): Item[] {
   return placed.sort((a, b) => a.y - b.y || a.x - b.x);
 }
 
-/** 已知卡片按保存的布局还原；布局里没有的新卡片追加到底部。 */
+/** 按保存的布局还原：只保留布局里有的卡片，被移除的卡片不会自动回填；布局为空时回退标准模板。 */
 function adopt(saved: Item[], cards: DashCard[]): Item[] {
+  if (!saved.length) return defaultLayout(cards);
   const known = new Set(cards.map(c => c.id));
   const kept: Item[] = [];
   saved.forEach(l => {
     if (!known.has(l.id) || kept.some(k => k.id === l.id)) return;
     kept.push({ id: l.id, x: clamp(l.x | 0, 0, COLS - 1), y: Math.max(0, l.y | 0), w: clamp(l.w | 0 || COLS, MIN_W, COLS), h: clamp(l.h | 0 || 8, MIN_H, 40) });
-  });
-  let bottom = kept.reduce((m, i) => Math.max(m, i.y + i.h), 0);
-  cards.forEach(c => {
-    if (kept.some(k => k.id === c.id)) return;
-    kept.push({ id: c.id, x: 0, y: bottom, w: clamp(c.w ?? COLS, MIN_W, COLS), h: clamp(c.h ?? 8, MIN_H, 40) });
-    bottom += c.h ?? 8;
   });
   return resolveDown(kept);
 }
@@ -141,6 +136,13 @@ export function DashBoard({ page, cards, notify }: { page: string, cards: DashCa
     catch (e: any) { notify(e.message, true); } finally { setBusy(false); }
   };
 
+  const hidden = cards.filter(c => !layout.some(l => l.id === c.id));
+  const addCard = (id: string) => {
+    const card = cards.find(c => c.id === id); if (!card) return;
+    setLayout(prev => resolveDown([...prev, { id, x: 0, y: prev.reduce((m, i) => Math.max(m, i.y + i.h), 0), w: clamp(card.w ?? COLS, MIN_W, COLS), h: clamp(card.h ?? 8, MIN_H, 40) }]));
+  };
+  const dropCard = (id: string) => setLayout(prev => prev.filter(i => i.id !== id));
+
   const maxY = layout.reduce((m, i) => Math.max(m, i.y + i.h), 0);
   const width = (w: number) => w * colW + (w - 1) * GAP;
 
@@ -152,6 +154,10 @@ export function DashBoard({ page, cards, notify }: { page: string, cards: DashCa
           {templates.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
         </select>
         {editing && <span className="dash-hint">拖动卡片标题移动，拖右下角改大小</span>}
+        {editing && <select className="dash-add" value="" onChange={e => { if (e.target.value) addCard(e.target.value); }}>
+          <option value="">+ 添加卡片</option>
+          {hidden.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+        </select>}
       </div>
       <div className="dash-actions">
         {editing ? <>
@@ -171,6 +177,7 @@ export function DashBoard({ page, cards, notify }: { page: string, cards: DashCa
             <header className="dash-card-head" onPointerDown={e => startDrag(e, it, 'move')}>
               {editing && <GripVertical size={14} className="dash-grip" />}
               <span>{card.title}</span>
+              {editing && <button className="dash-drop" title="移除卡片" onPointerDown={e => e.stopPropagation()} onClick={() => dropCard(it.id)}><X size={13} /></button>}
             </header>
             <div className="dash-card-body">{card.content}</div>
             {editing && <i className="dash-resize" onPointerDown={e => startDrag(e, it, 'resize')} />}

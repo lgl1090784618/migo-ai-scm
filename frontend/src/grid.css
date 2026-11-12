@@ -2,6 +2,9 @@
 .dash-template{display:flex;align-items:center;gap:8px;color:#475467;font-size:13px}
 .dash-template select{height:32px;padding:0 28px 0 10px;border:1px solid #d6dbe4;border-radius:8px;background:#fff;font-size:13px;color:#1f2937;cursor:pointer}
 .dash-hint{color:#98a2b3;font-size:12px}
+.dash-add{height:32px;padding:0 26px 0 10px;border:1px dashed #b9c6da;border-radius:8px;background:#fff;font-size:13px;color:#2f6bff;cursor:pointer}
+.dash-drop{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:0;border-radius:6px;background:transparent;color:#98a2b3;cursor:pointer}
+.dash-drop:hover{background:#fef2f2;color:#ef4444}
 .dash-actions{display:flex;gap:8px}
 .dash-actions .danger{color:#b42318;border-color:#f3c9c4}
 .dash-wrap{width:100%}

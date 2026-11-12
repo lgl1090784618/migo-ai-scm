@@ -82,6 +82,43 @@ class InsightController {
         return result;
     }
 
+    /** 近 N 天采集趋势与来源占比，用于看板图表卡片。同样只读本地采集库。 */
+    @GetMapping("/trend")
+    Map<String,Object> trend(@RequestParam(defaultValue="14") int days){
+        String t=DomainSupport.TENANT;
+        int n=Math.max(7,Math.min(60,days));
+        Map<String,long[]> slots=new LinkedHashMap<>();
+        java.time.LocalDate today=java.time.LocalDate.now();
+        for(int i=n-1;i>=0;i--) slots.put(today.minusDays(i).toString(),new long[]{0,0});
+        db.queryForList("""
+            SELECT to_char(received_at,'YYYY-MM-DD') AS d, count(*) AS batches,
+                   coalesce(sum(event_count),0) AS events
+            FROM ingest_batch
+            WHERE tenant_id=? AND received_at > now() - make_interval(days => ?)
+            GROUP BY 1
+            """,t,n).forEach(r->{
+            long[] slot=slots.get(String.valueOf(r.get("d")));
+            if(slot!=null){slot[0]=((Number)r.get("batches")).longValue();slot[1]=((Number)r.get("events")).longValue();}
+        });
+        List<Map<String,Object>> series=new ArrayList<>();
+        slots.forEach((d,v)->series.add(Map.of("day",d,"label",d.substring(5),"batches",v[0],"events",v[1])));
+        List<Map<String,Object>> bySource=db.queryForList("""
+            SELECT coalesce(p.code,'other') AS code, s.name AS name,
+                   coalesce(sum(b.event_count),0) AS events
+            FROM source_instance s
+            LEFT JOIN platform p ON p.id=s.platform_id
+            LEFT JOIN ingest_batch b ON b.source_id=s.id AND b.received_at > now() - interval '30 days'
+            WHERE s.tenant_id=?
+            GROUP BY p.code,s.name
+            HAVING coalesce(sum(b.event_count),0) > 0
+            ORDER BY 3 DESC
+            """,t);
+        Map<String,Object> result=new LinkedHashMap<>();
+        result.put("days",series);
+        result.put("bySource",bySource);
+        return result;
+    }
+
     @GetMapping("/coverage")
     Map<String,Object> coverage(){
         String t=DomainSupport.TENANT;
