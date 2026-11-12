@@ -325,7 +325,7 @@ code, .mono, .code-input, .json { font-family: var(--mono); font-size: 12.5px; }
 .dist-value small { color: var(--muted); margin-left: 3px; }
 
 .chain-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s4) var(--s5); box-shadow: var(--sh-1); }
-.chain-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--s4); }
+.chain-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(142px, 1fr)); gap: var(--s3); }
 .chain-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-bottom: var(--s3); }
 .chain-note { color: var(--muted); font-size: 11.5px; }
 .chain-value { font-size: 17px; font-weight: 620; font-variant-numeric: tabular-nums; }
@@ -405,7 +405,8 @@ input::placeholder, textarea::placeholder { color: #9dafc0; }
 .filter-right { margin-left: auto; display: flex; align-items: center; gap: var(--s2); }
 .state-filter { max-width: 180px; }
 .sub-toolbar { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; }
-.check-col { width: 34px; }
+.check-col { width: 42px; min-width: 42px; max-width: 42px; padding-right: 0; text-align: center; }
+.table-scroll td.check-col input, .table-scroll th.check-col input { margin: 0; }
 .bulk-bar { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s4); background: var(--brand-50); border-radius: var(--r-md); font-size: 12.5px; color: var(--brand-700); }
 .client-form { display: grid; gap: var(--s4); }
 
@@ -446,6 +447,7 @@ input::placeholder, textarea::placeholder { color: #9dafc0; }
 .table-scroll .nowrap { white-space: nowrap; }
 .table-scroll .grain { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); }
 .table-scroll th.w8, .table-scroll td.w8 { width: 8%; }
+.table-scroll th.w6, .table-scroll td.w6 { width: 6%; }
 .table-scroll th.w10, .table-scroll td.w10 { width: 10%; }
 .table-scroll th.w12, .table-scroll td.w12 { width: 12%; }
 .table-scroll th.w14, .table-scroll td.w14 { width: 14%; }

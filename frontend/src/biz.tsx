@@ -113,7 +113,7 @@ export function InventoryPage({ notify }: { notify: Notice }) {
     const list = rows(spec);
     const stale = staleDays(spec.as_of);
     return {
-      id: key, title, w: 12, h: 15,
+      id: key, title, w: 12, h: 12,
       content: spec.available === false
         ? empty(`${title}数据集尚未登记，先在「数据接入」完成连接与采集。`)
         : <>
@@ -124,7 +124,7 @@ export function InventoryPage({ notify }: { notify: Notice }) {
             <Stat label="可用" value={fmt(spec.usable)} unit="件" tone="ok"
               note={`${num(spec.total) > 0 ? Math.round(num(spec.usable) / num(spec.total) * 100) : 0}% 可售`} />
             {key === 'wms' && <>
-              <Stat label="冻结" value={fmt(spec.frozen)} unit="件" tone="warn" />
+              <Stat label="冻结" value={fmt(spec.frozen)} unit="件" tone={num(spec.frozen) > 0 ? 'warn' : undefined} note={num(spec.frozen) > 0 ? '已锁定不可售' : '无冻结'} />
               <Stat label="库存金额" value={`¥${fmt(spec.amount)}`} note="stockMoney 汇总" />
             </>}
             {key === 'factory' && <Stat label="占用" value={fmt(spec.occupied)} unit="件" tone="warn" note="工厂已占用未发" />}
@@ -135,16 +135,16 @@ export function InventoryPage({ notify }: { notify: Notice }) {
           </StatGrid>
           {stale !== null && stale >= 30 && <div className="notice-line">这批 {title} 观测已陈旧 {stale} 天，是接入联调时的历史快照；要作为经营口径使用，需要先补一次完整采集。</div>}
           <div className="table-scroll"><table><thead><tr>
-            <th>SKU</th>{key === 'factory' ? <th>SPU / 工厂</th> : key === 'fba' ? <th>MSKU / 店铺</th> : <th>条码</th>}
-            <th>总库存</th><th>可用</th>{key === 'wms' ? <><th>冻结</th><th>金额</th></> : key === 'factory' ? <th>占用</th> : <><th>预留</th><th>不可用</th></>}
-            <th>更新</th></tr></thead>
+            <th className="w18 nowrap">SKU</th>{key === 'factory' ? <th className="w20">SPU / 工厂</th> : key === 'fba' ? <th className="w20">MSKU / 店铺</th> : <th className="w18 nowrap">条码</th>}
+            <th className="w10 nowrap">总库存</th><th className="w10 nowrap">可用</th>{key === 'wms' ? <><th className="w10 nowrap">冻结</th><th className="w12 nowrap">金额</th></> : key === 'factory' ? <th className="w10 nowrap">占用</th> : <><th className="w10 nowrap">预留</th><th className="w10 nowrap">不可用</th></>}
+            <th className="w14 nowrap">更新</th></tr></thead>
             <tbody>{list.map((r, i) => <tr key={String(r.sku || i)}>
-              <td><code>{String(r.sku || '—')}</code></td>
-              <td>{key === 'factory' ? <>{String(r.spu || '—')}<small className="muted">{String(r.factory || '')}</small></> : key === 'fba' ? <>{String(r.msku || '—')}<small className="muted">{String(r.shop || '')}</small></> : <code>{String(r.code || '—')}</code>}</td>
-              <td>{fmt(r.total)}</td>
-              <td>{fmt(r.usable)}</td>
-              {key === 'wms' ? <><td>{fmt(r.frozen)}</td><td>¥{fmt(r.amount)}</td></> : key === 'factory' ? <td>{fmt(r.occupied)}</td> : <><td>{fmt(r.reserved)}</td><td>{fmt(r.unable)}</td></>}
-              <td>{when(r.updated)}</td>
+              <td className="nowrap"><code>{String(r.sku || '—')}</code></td>
+              <td>{key === 'factory' ? <>{String(r.spu || '—')}<small className="muted">{String(r.factory || '')}</small></> : key === 'fba' ? <>{String(r.msku || '—')}<small className="muted">{String(r.shop || '')}</small></> : <span className="mono muted">{String(r.code || '—')}</span>}</td>
+              <td className="nowrap">{fmt(r.total)}</td>
+              <td className="nowrap">{fmt(r.usable)}</td>
+              {key === 'wms' ? <><td className="nowrap">{fmt(r.frozen)}</td><td className="nowrap">¥{fmt(r.amount)}</td></> : key === 'factory' ? <td className="nowrap">{fmt(r.occupied)}</td> : <><td className="nowrap">{fmt(r.reserved)}</td><td className="nowrap">{fmt(r.unable)}</td></>}
+              <td className="nowrap muted">{when(r.updated)}</td>
             </tr>)}</tbody></table></div>
         </>,
     };
@@ -190,7 +190,7 @@ export function SkuChainPage({ notify }: { notify: Notice }) {
     {
       id: 'chain', title: '按款号看链路', w: 12, h: 18,
       content: <div className="table-scroll"><table>
-        <thead><tr><th>款号</th><th>品名</th><th>链路</th><th>生产</th><th>工厂仓</th><th>国内仓</th><th>平台仓</th><th>SKU</th></tr></thead>
+        <thead><tr><th className="w14 nowrap">款号</th><th className="w22">品名</th><th className="w18">链路</th><th className="w16">生产</th><th className="w10 nowrap">工厂仓</th><th className="w10 nowrap">国内仓</th><th className="w10 nowrap">平台仓</th><th className="w6 nowrap">SKU</th></tr></thead>
         <tbody>{spus.map(r => {
           const p = seg(r, 'production'), f = seg(r, 'factory'), w = seg(r, 'wms'), b = seg(r, 'fba');
           const statuses = Object.entries((p.byStatus as Row) || {}).map(([k, v]) => `${k} ${fmt(v)}`).join(' · ');
