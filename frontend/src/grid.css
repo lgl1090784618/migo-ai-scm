@@ -9,6 +9,10 @@
 .dash-actions .danger{color:#b42318;border-color:#f3c9c4}
 .dash-wrap{width:100%}
 .dash-canvas{position:relative;width:100%}
+.dash-stack{display:flex;flex-direction:column;gap:12px;width:100%}
+.dash-card.stacked{position:relative;left:auto;top:auto;width:100%;height:auto;overflow:visible}
+.dash-card.stacked .dash-card-body{flex:0 1 auto;min-height:0;overflow:visible}
+.dash-card.stacked .dash-card-head{cursor:default}
 
 .dash-card{position:absolute;display:flex;flex-direction:column;background:#fff;border:1px solid #e6e8ee;border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04);transition:box-shadow .15s ease}
 .dash-card.editing{border-style:dashed;border-color:#a7bbf7}

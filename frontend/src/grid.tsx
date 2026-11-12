@@ -54,13 +54,23 @@ function adopt(saved: Item[], cards: DashCard[]): Item[] {
   return resolveDown(kept);
 }
 
-export function DashBoard({ page, cards, notify }: { page: string, cards: DashCard[], notify: Notice }) {
-  const [layout, setLayout] = useState<Item[]>(() => defaultLayout(cards));
+/* 窄屏（<900px）时忽略保存的栅格位置，按原顺序单列铺开，避免卡片被压成细条 */
+function stackLayout(items: Item[]): Item[] {
+  let y = 0;
+  return [...items].sort((a, b) => a.y - b.y || a.x - b.x).map(it => {
+    const next = { ...it, x: 0, y, w: COLS, h: Math.max(it.h, 6) };
+    y += next.h + 1;
+    return next;
+  });
+}
+
+export function DashBoard({ page, cards, notify }: { page: string, cards: DashCard[], notify: Notice }) {  const [layout, setLayout] = useState<Item[]>(() => defaultLayout(cards));
   const [templates, setTemplates] = useState<{ name: string, layout: Item[] }[]>([]);
   const [current, setCurrent] = useState(SYSTEM);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [colW, setColW] = useState(0);
+  const [stacked, setStacked] = useState(false);
   const [dragId, setDragId] = useState('');
   const wrap = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: string, mode: 'move' | 'resize', sx: number, sy: number, orig: Item, unitW: number } | null>(null);
@@ -77,7 +87,11 @@ export function DashBoard({ page, cards, notify }: { page: string, cards: DashCa
 
   useEffect(() => {
     const el = wrap.current; if (!el) return;
-    const measure = () => setColW(Math.max(40, (el.clientWidth - (COLS - 1) * GAP) / COLS));
+    const measure = () => {
+      const cw = el.clientWidth;
+      setColW(Math.max(40, (cw - (COLS - 1) * GAP) / COLS));
+      setStacked(cw < 900);
+    };
     measure();
     const ro = new ResizeObserver(measure); ro.observe(el);
     return () => ro.disconnect();
@@ -99,7 +113,7 @@ export function DashBoard({ page, cards, notify }: { page: string, cards: DashCa
     window.removeEventListener('pointerup', onUp);
   };
   const startDrag = (e: React.PointerEvent, item: Item, mode: 'move' | 'resize') => {
-    if (!editing) return;
+    if (!editing || stacked) return;
     e.preventDefault(); e.stopPropagation();
     drag.current = { id: item.id, mode, sx: e.clientX, sy: e.clientY, orig: { ...item }, unitW: colW };
     setDragId(item.id);
@@ -143,7 +157,8 @@ export function DashBoard({ page, cards, notify }: { page: string, cards: DashCa
   };
   const dropCard = (id: string) => setLayout(prev => prev.filter(i => i.id !== id));
 
-  const maxY = layout.reduce((m, i) => Math.max(m, i.y + i.h), 0);
+  const view = stacked ? stackLayout(layout) : layout;
+  const maxY = view.reduce((m, i) => Math.max(m, i.y + i.h), 0);
   const width = (w: number) => w * colW + (w - 1) * GAP;
 
   return <>
@@ -153,7 +168,8 @@ export function DashBoard({ page, cards, notify }: { page: string, cards: DashCa
           <option value={SYSTEM}>{SYSTEM}</option>
           {templates.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
         </select>
-        {editing && <span className="dash-hint">拖动卡片标题移动，拖右下角改大小</span>}
+        {editing && !stacked && <span className="dash-hint">拖动卡片标题移动，拖右下角改大小</span>}
+        {editing && stacked && <span className="dash-hint">窗口较窄，已自动单列排列；放大窗口后可调整布局</span>}
         {editing && <select className="dash-add" value="" onChange={e => { if (e.target.value) addCard(e.target.value); }}>
           <option value="">+ 添加卡片</option>
           {hidden.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
@@ -169,21 +185,36 @@ export function DashBoard({ page, cards, notify }: { page: string, cards: DashCa
       </div>
     </div>
     <div className="dash-wrap" ref={wrap}>
-      <div className="dash-canvas" style={{ height: colW ? maxY * (ROW_H + GAP) : 0 }}>
-        {colW > 0 && layout.map(it => {
-          const card = cards.find(c => c.id === it.id); if (!card) return null;
-          return <section key={it.id} className={`dash-card ${editing ? 'editing' : ''} ${dragId === it.id ? 'dragging' : ''}`}
-            style={{ left: it.x * (colW + GAP), top: it.y * (ROW_H + GAP), width: width(it.w), height: it.h * ROW_H + (it.h - 1) * GAP }}>
-            <header className="dash-card-head" onPointerDown={e => startDrag(e, it, 'move')}>
-              {editing && <GripVertical size={14} className="dash-grip" />}
-              <span>{card.title}</span>
-              {editing && <button className="dash-drop" title="移除卡片" onPointerDown={e => e.stopPropagation()} onClick={() => dropCard(it.id)}><X size={13} /></button>}
-            </header>
-            <div className="dash-card-body">{card.content}</div>
-            {editing && <i className="dash-resize" onPointerDown={e => startDrag(e, it, 'resize')} />}
-          </section>;
-        })}
-      </div>
+      {stacked ? (
+        <div className="dash-stack">
+          {view.map(it => {
+            const card = cards.find(c => c.id === it.id); if (!card) return null;
+            return <section key={it.id} className={`dash-card stacked ${editing ? 'editing' : ''}`}>
+              <header className="dash-card-head">
+                <span>{card.title}</span>
+                {editing && <button className="dash-drop" title="移除卡片" onClick={() => dropCard(it.id)}><X size={13} /></button>}
+              </header>
+              <div className="dash-card-body">{card.content}</div>
+            </section>;
+          })}
+        </div>
+      ) : (
+        <div className="dash-canvas" style={{ height: colW ? maxY * (ROW_H + GAP) : 0 }}>
+          {colW > 0 && view.map(it => {
+            const card = cards.find(c => c.id === it.id); if (!card) return null;
+            return <section key={it.id} className={`dash-card ${editing ? 'editing' : ''} ${dragId === it.id ? 'dragging' : ''}`}
+              style={{ left: it.x * (colW + GAP), top: it.y * (ROW_H + GAP), width: width(it.w), height: it.h * ROW_H + (it.h - 1) * GAP }}>
+              <header className="dash-card-head" onPointerDown={e => startDrag(e, it, 'move')}>
+                {editing && <GripVertical size={14} className="dash-grip" />}
+                <span>{card.title}</span>
+                {editing && <button className="dash-drop" title="移除卡片" onPointerDown={e => e.stopPropagation()} onClick={() => dropCard(it.id)}><X size={13} /></button>}
+              </header>
+              <div className="dash-card-body">{card.content}</div>
+              {editing && <i className="dash-resize" onPointerDown={e => startDrag(e, it, 'resize')} />}
+            </section>;
+          })}
+        </div>
+      )}
     </div>
   </>;
 }
