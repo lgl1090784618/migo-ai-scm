@@ -12,24 +12,34 @@ const COLS = 12, ROW_H = 26, GAP = 12, MIN_W = 3, MIN_H = 3, SYSTEM = '标准模
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const overlap = (a: Item, b: Item) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
+/** 标准模板：按卡片宽度做简单装箱，半宽卡片自动左右并排。 */
 function defaultLayout(cards: DashCard[]): Item[] {
-  let y = 0;
-  return cards.map(c => { const item = { id: c.id, x: 0, y, w: clamp(c.w ?? COLS, MIN_W, COLS), h: clamp(c.h ?? 8, MIN_H, 40) }; y += item.h; return item; });
+  const placed: Item[] = [];
+  for (const c of cards) {
+    const w = clamp(c.w ?? COLS, MIN_W, COLS), h = clamp(c.h ?? 8, MIN_H, 40);
+    let done = false;
+    for (let y = 0; y < 400 && !done; y++) {
+      for (let x = 0; x + w <= COLS; x += w) {
+        const cand = { id: c.id, x, y, w, h };
+        if (!placed.some(p => overlap(p, cand))) { placed.push(cand); done = true; break; }
+      }
+    }
+    if (!done) placed.push({ id: c.id, x: 0, y: placed.reduce((m, i) => Math.max(m, i.y + i.h), 0), w, h });
+  }
+  return placed;
 }
 
-/** 先把每张卡放到不重叠的位置，再整体向上压实，避免出现空洞。 */
-function settle(items: Item[]): Item[] {
-  const placed: Item[] = [];
-  for (const it of [...items].sort((a, b) => a.y - b.y || a.x - b.x)) {
-    const cur = { ...it }; let guard = 0;
+/** 保持卡片给定的位置，只把互相重叠的依次下移；不做向上压实，否则拖动后会被弹回顶部。 */
+function resolveDown(items: Item[], priorityId?: string): Item[] {
+  const pri = priorityId ? items.find(i => i.id === priorityId) : undefined;
+  const placed: Item[] = pri ? [{ ...pri }] : [];
+  for (const it of items.filter(i => i.id !== pri?.id).sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const cur = { ...it };
+    let guard = 0;
     while (placed.some(p => overlap(p, cur)) && guard++ < 400) cur.y += 1;
     placed.push(cur);
   }
-  for (const cur of placed) {
-    let guard = 0;
-    while (cur.y > 0 && !placed.some(p => p !== cur && overlap(p, { ...cur, y: cur.y - 1 })) && guard++ < 400) cur.y -= 1;
-  }
-  return placed;
+  return placed.sort((a, b) => a.y - b.y || a.x - b.x);
 }
 
 /** 已知卡片按保存的布局还原；布局里没有的新卡片追加到底部。 */
@@ -46,7 +56,7 @@ function adopt(saved: Item[], cards: DashCard[]): Item[] {
     kept.push({ id: c.id, x: 0, y: bottom, w: clamp(c.w ?? COLS, MIN_W, COLS), h: clamp(c.h ?? 8, MIN_H, 40) });
     bottom += c.h ?? 8;
   });
-  return settle(kept);
+  return resolveDown(kept);
 }
 
 export function DashBoard({ page, cards, notify }: { page: string, cards: DashCard[], notify: Notice }) {
@@ -87,8 +97,9 @@ export function DashBoard({ page, cards, notify }: { page: string, cards: DashCa
       : { ...it, w: clamp(d.orig.w + Math.round(dx / unitW), MIN_W, COLS - it.x), h: clamp(d.orig.h + Math.round(dy / (ROW_H + GAP)), MIN_H, 40) }));
   };
   const onUp = () => {
+    const dragged = drag.current?.id || '';
     drag.current = null; setDragId('');
-    setLayout(prev => settle(prev));
+    setLayout(prev => resolveDown(prev, dragged));
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
   };
