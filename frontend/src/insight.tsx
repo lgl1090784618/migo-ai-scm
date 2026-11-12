@@ -138,7 +138,7 @@ export function DataHealth({ notify }: { notify: Notice }) {
           <td><Badge text={stateText[s.state] || s.state} t={tone(s.state)} /></td>
           <td>{date(s.lastBatchAt)}</td><td><Badge text={l.text} t={l.t} /></td><td>{s.cnt24 ?? 0}</td>
           <td>{s.schedule_enabled ? <Badge text={`每 ${Math.round((s.interval_seconds || 0) / 60)} 分钟`} t="ok" /> : <Badge text="未启用" t="idle" />}</td>
-          <td><code>{s.last_error || '—'}</code></td></tr>; })}</tbody></table></div>
+          <td>{s.last_error ? <code className="ellipsis" title={s.last_error}>{s.last_error}</code> : <span className="muted">—</span>}</td></tr>; })}</tbody></table></div>
     },
   ];
 
@@ -166,17 +166,18 @@ export function ScheduleBoard({ notify }: { notify: Notice }) {
       </div>
     },
     {
-      id: 'schedules', title: '定时采集计划', w: 6, h: 11, content: <div className="table-scroll"><table><thead><tr><th>来源</th><th>平台</th><th>状态</th><th>间隔</th><th>下次运行</th><th>近 24h 批次</th></tr></thead>
-        <tbody>{sources.map(s => <tr key={s.id}><td>{s.name}</td><td>{s.platform_name}</td>
-          <td>{s.schedule_enabled ? <Badge text="已启用" t="ok" /> : <Badge text="未启用" t="idle" />}</td>
-          <td>{s.interval_seconds ? `${Math.round(s.interval_seconds / 60)} 分钟` : '—'}</td>
-          <td>{date(s.next_run_at)}</td><td>{s.cnt24 ?? 0}</td></tr>)}</tbody></table></div>
+      id: 'schedules', title: '定时采集计划', w: 6, h: 11, content: <div className="table-scroll"><table><thead><tr><th className="w34">来源 / 平台</th><th className="w14">状态</th><th className="w14 nowrap">间隔</th><th className="w20 nowrap">下次运行</th><th className="w14 nowrap">近 24h</th></tr></thead>
+        <tbody>{sources.map(s => <tr key={s.id}><td className="nowrap"><strong>{s.name}</strong><small className="muted">{s.platform_name}</small></td>
+          <td><Badge text={s.schedule_enabled ? '已启用' : '未启用'} t={s.schedule_enabled ? 'ok' : 'idle'} /></td>
+          <td className="nowrap">{s.interval_seconds ? `${Math.round(s.interval_seconds / 60)} 分钟` : '—'}</td>
+          <td className="nowrap">{s.next_run_at ? date(s.next_run_at).slice(5) : '—'}</td>
+          <td className="nowrap">{s.cnt24 ?? 0} 批</td></tr>)}</tbody></table></div>
     },
     {
       id: 'jobs', title: '最近采集任务', w: 6, h: 11, content: jobs.length
-        ? <div className="table-scroll"><table><thead><tr><th>创建时间</th><th>来源</th><th>数据集</th><th>状态</th><th>页数</th><th>记录数</th><th>错误</th></tr></thead>
-          <tbody>{jobs.map(j => <tr key={j.id}><td>{date(j.created_at)}</td><td>{j.source_name}</td><td><code title={j.dataset_code}>{j.dataset_code}</code></td>
-            <td><Badge text={stateText[j.state] || j.state} t={tone(j.state)} /></td><td>{j.pages_done}</td><td>{j.record_count}</td><td><code>{j.error_code || '—'}</code></td></tr>)}</tbody></table></div>
+        ? <div className="table-scroll"><table><thead><tr><th className="w22 nowrap">创建时间</th><th className="w30">来源</th><th className="w16">状态</th><th className="w14 nowrap">页 / 记录</th><th className="w18">错误</th></tr></thead>
+          <tbody>{jobs.map(j => <tr key={j.id}><td className="nowrap">{date(j.created_at).slice(0, 11)}</td><td><strong>{j.source_name}</strong><small className="mono ellipsis" title={j.dataset_code}>{j.dataset_code}</small></td>
+            <td><Badge text={stateText[j.state] || j.state} t={tone(j.state)} /></td><td className="nowrap">{j.pages_done} / {j.record_count}</td><td>{j.error_code ? <code className="ellipsis" title={j.error_code}>{j.error_code}</code> : <span className="muted">—</span>}</td></tr>)}</tbody></table></div>
         : <p className="muted padded">还没有采集任务。启用定时计划或手动执行一轮后出现在这里。</p>
     },
   ];
