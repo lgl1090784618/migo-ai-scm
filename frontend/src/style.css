@@ -448,6 +448,10 @@ input::placeholder, textarea::placeholder { color: #9dafc0; }
 .table-scroll .grain { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); }
 .table-scroll th.w8, .table-scroll td.w8 { width: 8%; }
 .table-scroll th.w6, .table-scroll td.w6 { width: 6%; }
+.table-scroll th.w48, .table-scroll td.w48 { width: 48%; }
+.tag { display: inline-block; padding: 2px 9px; border-radius: var(--r-pill); background: #eef3f8; color: var(--fg-2); font-size: 12px; line-height: 18px; white-space: nowrap; }
+.ok-text { color: var(--ok); }
+.panel-actions { display: flex; gap: var(--s2); align-items: center; }
 .table-scroll th.w10, .table-scroll td.w10 { width: 10%; }
 .table-scroll th.w12, .table-scroll td.w12 { width: 12%; }
 .table-scroll th.w14, .table-scroll td.w14 { width: 14%; }
