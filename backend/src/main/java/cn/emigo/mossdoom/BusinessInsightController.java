@@ -55,23 +55,7 @@ class BusinessInsightController {
         UUID id = dataset("production_order_observations");
         if (id == null) { out.put("available", false); return out; }
 
-        List<Map<String, Object>> raw = biz.queryForList("""
-            SELECT DISTINCT ON (payload->>'apply_no')
-                   payload->>'apply_no'  AS apply_no,
-                   payload->>'order_no'  AS order_no,
-                   payload->>'goods_no'  AS goods_no,
-                   payload->>'goods_name' AS goods_name,
-                   (payload->>'quantity')::numeric AS quantity,
-                   payload->>'status'    AS status,
-                   payload->>'attr_1'    AS region_raw,
-                   payload->>'attr_9'    AS shop_raw,
-                   payload->>'creator'   AS creator,
-                   payload->>'modified'  AS modified,
-                   occurred_at
-            FROM standard_event_projection
-            WHERE dataset_id=?
-            ORDER BY payload->>'apply_no', occurred_at DESC
-            """, id);
+        List<Map<String, Object>> raw = latestProductionRows(id);
 
         double totalQty = 0;
         Map<String, double[]> byStatus = new LinkedHashMap<>(), byShop = new LinkedHashMap<>(), byRegion = new LinkedHashMap<>();
@@ -234,7 +218,208 @@ class BusinessInsightController {
         return block;
     }
 
-    /** {名称: [单数, 数量]} → 按数量倒序的数组，方便前端直接渲染。 */
+    /** 每张生产单只保留最后一条事件，返回列与手工查询一致。 */
+    private List<Map<String, Object>> latestProductionRows(UUID dataset) {
+        return biz.queryForList("""
+            SELECT DISTINCT ON (payload->>'apply_no')
+                   payload->>'apply_no'  AS apply_no,
+                   payload->>'order_no'  AS order_no,
+                   payload->>'goods_no'  AS goods_no,
+                   payload->>'goods_name' AS goods_name,
+                   coalesce(nullif(payload->>'quantity', ''), '0')::numeric AS quantity,
+                   payload->>'status'    AS status,
+                   payload->>'attr_1'    AS region_raw,
+                   payload->>'attr_9'    AS shop_raw,
+                   payload->>'creator'   AS creator,
+                   payload->>'modified'  AS modified,
+                   occurred_at
+            FROM standard_event_projection
+            WHERE dataset_id=?
+            ORDER BY payload->>'apply_no', occurred_at DESC
+            """, dataset);
+    }
+
+    /**
+     * SKU 全链路：以款号(SPU)为轴，把生产、工厂仓、国内仓、平台仓四段观测拼到一行。
+     *
+     * <p>归并规则：生产单的 {@code goods_no}、工厂库存的 {@code localSpuCode}、
+     * WMS/平台仓的 {@code skuKey} 前缀（最后一个 {@code -} 之前）都等于款号，
+     * 因此不需要额外映射表。四个来源各自用真实 UUID 查，缺哪段就在结果里留空 null，
+     * 前端据此显示"未接入"，而不是显示 0。</p>
+     */
+    @GetMapping("/chain")
+    Map<String, Object> chain() {
+        Map<String, Object> out = new LinkedHashMap<>();
+        Map<String, Map<String, Object>> spus = new LinkedHashMap<>();
+
+        // 生产段：按 goods_no 归并
+        UUID prod = dataset("production_order_observations");
+        if (prod != null) {
+            for (Map<String, Object> r : latestProductionRows(prod)) {
+                String spu = str(r.get("goods_no"));
+                if (spu == null) continue;
+                Map<String, Object> e = spu(spus, spu);
+                if (e.get("goodsName") == null && r.get("goods_name") != null) e.put("goodsName", r.get("goods_name"));
+                Map<String, Object> p = section(e, "production");
+                p.put("orders", num(p.get("orders")) + 1);
+                p.put("qty", num(p.get("qty")) + num(r.get("quantity")));
+                status(p, str(r.get("status")), num(r.get("quantity")));
+                String occurred = String.valueOf(r.get("occurred_at"));
+                if (p.get("lastAt") == null || occurred.compareTo(String.valueOf(p.get("lastAt"))) > 0) p.put("lastAt", occurred);
+            }
+        }
+
+        // 工厂仓：localSpuCode 直接给款号；缺失时用 skuKey 前缀兜底
+        UUID factory = dataset("factory_stock_observations");
+        if (factory != null) {
+            for (Map<String, Object> r : biz.queryForList("""
+                SELECT DISTINCT ON (payload->>'skuKey')
+                       payload->>'skuKey' AS sku, payload->>'localSpuCode' AS spu,
+                       coalesce(nullif(payload->>'totalInventoryQty',''),'0')::numeric AS total,
+                       coalesce(nullif(payload->>'usableInventoryQty',''),'0')::numeric AS usable,
+                       coalesce(nullif(payload->>'occupyInventoryQty',''),'0')::numeric AS occupied,
+                       payload->>'updateTime' AS updated, occurred_at
+                FROM standard_event_projection WHERE dataset_id=?
+                ORDER BY payload->>'skuKey', occurred_at DESC
+                """, factory)) {
+                Map<String, Object> e = spu(spus, spuOf(r.get("spu"), r.get("sku")));
+                if (e == null) continue;
+                Map<String, Object> f = section(e, "factory");
+                f.put("skus", num(f.get("skus")) + 1);
+                f.put("total", num(f.get("total")) + num(r.get("total")));
+                f.put("usable", num(f.get("usable")) + num(r.get("usable")));
+                f.put("occupied", num(f.get("occupied")) + num(r.get("occupied")));
+                String updated = str(r.get("updated"));
+                if (updated != null && (f.get("asOf") == null || updated.compareTo(String.valueOf(f.get("asOf"))) > 0)) f.put("asOf", updated);
+                sku(e, str(r.get("sku")));
+            }
+        }
+
+        // 平台仓 FBA
+        UUID fba = dataset("logistics_fba_observations");
+        if (fba != null) {
+            for (Map<String, Object> r : biz.queryForList("""
+                SELECT DISTINCT ON (payload->>'skuKey')
+                       payload->>'skuKey' AS sku,
+                       coalesce(nullif(payload->>'totalQty',''),'0')::numeric AS total,
+                       coalesce(nullif(payload->>'fbaAbleQty',''),'0')::numeric AS usable,
+                       coalesce(nullif(payload->>'reservedQty',''),'0')::numeric AS reserved,
+                       payload->>'updateTime' AS updated, occurred_at
+                FROM standard_event_projection WHERE dataset_id=?
+                ORDER BY payload->>'skuKey', occurred_at DESC
+                """, fba)) {
+                Map<String, Object> e = spu(spus, spuOf(null, r.get("sku")));
+                if (e == null) continue;
+                Map<String, Object> f = section(e, "fba");
+                f.put("skus", num(f.get("skus")) + 1);
+                f.put("total", num(f.get("total")) + num(r.get("total")));
+                f.put("usable", num(f.get("usable")) + num(r.get("usable")));
+                f.put("reserved", num(f.get("reserved")) + num(r.get("reserved")));
+                String updated = str(r.get("updated"));
+                if (updated != null && (f.get("asOf") == null || updated.compareTo(String.valueOf(f.get("asOf"))) > 0)) f.put("asOf", updated);
+                sku(e, str(r.get("sku")));
+            }
+        }
+
+        // 国内仓 WMS
+        UUID wms = dataset("wms_stock_observations");
+        if (wms != null) {
+            for (Map<String, Object> r : biz.queryForList("""
+                SELECT DISTINCT ON (payload->>'skuKey')
+                       payload->>'skuKey' AS sku,
+                       coalesce(nullif(payload->>'qtyTotal',''),'0')::numeric AS total,
+                       coalesce(nullif(payload->>'qtyActive',''),'0')::numeric AS usable,
+                       coalesce(nullif(payload->>'qtyFreeze',''),'0')::numeric AS frozen,
+                       payload->>'modifyTime' AS updated, occurred_at
+                FROM standard_event_projection WHERE dataset_id=?
+                ORDER BY payload->>'skuKey', occurred_at DESC
+                """, wms)) {
+                Map<String, Object> e = spu(spus, spuOf(null, r.get("sku")));
+                if (e == null) continue;
+                Map<String, Object> w = section(e, "wms");
+                w.put("skus", num(w.get("skus")) + 1);
+                w.put("total", num(w.get("total")) + num(r.get("total")));
+                w.put("usable", num(w.get("usable")) + num(r.get("usable")));
+                w.put("frozen", num(w.get("frozen")) + num(r.get("frozen")));
+                String updated = str(r.get("updated"));
+                if (updated != null && (w.get("asOf") == null || updated.compareTo(String.valueOf(w.get("asOf"))) > 0)) w.put("asOf", updated);
+                sku(e, str(r.get("sku")));
+            }
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>(spus.values());
+        // 有生产单的排前面，其次按各段合计库存
+        rows.sort((a, b) -> {
+            double qa = num(section(a, "production").get("qty")) + stock(a);
+            double qb = num(section(b, "production").get("qty")) + stock(b);
+            return Double.compare(qb, qa);
+        });
+        double prodQty = 0, factoryUsable = 0, wmsUsable = 0, fbaUsable = 0;
+        for (Map<String, Object> r : rows) {
+            prodQty += num(section(r, "production").get("qty"));
+            factoryUsable += num(section(r, "factory").get("usable"));
+            wmsUsable += num(section(r, "wms").get("usable"));
+            fbaUsable += num(section(r, "fba").get("usable"));
+        }
+        out.put("spus", rows);
+        out.put("spuCount", rows.size());
+        out.put("productionQty", prodQty);
+        out.put("factoryUsable", factoryUsable);
+        out.put("wmsUsable", wmsUsable);
+        out.put("fbaUsable", fbaUsable);
+        out.put("sources", List.of(
+                Map.of("key", "production", "title", "生产", "available", prod != null),
+                Map.of("key", "factory", "title", "工厂仓", "available", factory != null),
+                Map.of("key", "wms", "title", "国内仓", "available", wms != null),
+                Map.of("key", "fba", "title", "平台仓", "available", fba != null)));
+        return out;
+    }
+
+    private static double stock(Map<String, Object> row) {
+        return num(section(row, "factory").get("total")) + num(section(row, "wms").get("total")) + num(section(row, "fba").get("total"));
+    }
+
+    private static String str(Object value) { return value == null ? null : String.valueOf(value); }
+
+    private static double num(Object value) { return value instanceof Number n ? n.doubleValue() : 0D; }
+
+    /** 款号：优先取 localSpuCode，缺失时用 SKU 编码最后一个 '-' 之前的部分。 */
+    private static String spuOf(Object spu, Object sku) {
+        String code = str(spu);
+        if (code != null && !code.isBlank()) return code;
+        String key = str(sku);
+        if (key == null || key.isBlank()) return null;
+        int i = key.lastIndexOf('-');
+        return i > 0 ? key.substring(0, i) : key;
+    }
+
+    private static Map<String, Object> spu(Map<String, Map<String, Object>> spus, String code) {
+        if (code == null || code.isBlank()) return null;
+        return spus.computeIfAbsent(code, k -> {
+            Map<String, Object> e = new LinkedHashMap<>();
+            e.put("spu", k);
+            for (String section : List.of("production", "factory", "wms", "fba")) e.put(section, new LinkedHashMap<String, Object>());
+            e.put("skus", new LinkedHashSet<String>());
+            return e;
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> section(Map<String, Object> entry, String key) {
+        return (Map<String, Object>) entry.get(key);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void status(Map<String, Object> production, String name, double qty) {
+        Map<String, Object> byStatus = (Map<String, Object>) production.computeIfAbsent("byStatus", k -> new LinkedHashMap<String, Object>());
+        byStatus.merge(name == null ? "未知" : name, qty, (a, b) -> num(a) + num(b));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void sku(Map<String, Object> entry, String code) {
+        if (code != null) ((Set<String>) entry.get("skus")).add(code);
+    }
+
     private static List<Map<String, Object>> flatten(Map<String, double[]> source) {
         List<Map<String, Object>> list = new ArrayList<>();
         source.forEach((name, v) -> {

@@ -10,3 +10,10 @@
 .dist-value small.muted { color: #a3aab8; }
 
 .kpi-value.kpi-small { font-size: 19px; line-height: 1.45; letter-spacing: 0; }
+
+/* SKU 全链路：四段圆点 */
+.stages { display: flex; gap: 8px; flex-wrap: wrap; }
+.stage { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted, #7a8493); white-space: nowrap; }
+.stage > i { width: 7px; height: 7px; border-radius: 50%; background: #d5dae2; display: inline-block; }
+.stage-on { color: var(--text, #1f2733); }
+.stage-on > i { background: #2fa36b; box-shadow: 0 0 0 2px rgba(47,163,107,.16); }

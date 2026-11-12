@@ -153,3 +153,65 @@ export function InventoryPage({ notify }: { notify: Notice }) {
       cards={[block('wms', '国内仓 WMS', wms), block('factory', '工厂仓', factory), block('fba', '平台仓 FBA', fba)]} />
   </>;
 }
+
+/* ------------------------------ SKU 全链路 ------------------------------ */
+
+/** 段位小圆点：有数据绿、没接入灰。 */
+function Stage({ on, text }: { on: boolean, text: string }) {
+  return <span className={`stage ${on ? 'stage-on' : ''}`}><i />{text}</span>;
+}
+
+export function SkuChainPage({ notify }: { notify: Notice }) {
+  const { data, busy, load } = useInsight('/api/biz/chain', notify);
+  const spus = (data?.spus as Row[]) || [];
+  const seg = (row: Row, key: string) => (row?.[key] as Row) || {};
+  // 生产段按「单数」判定，其余三段按「SKU 数」判定：生产 section 里没有 skus 字段。
+  const has = (row: Row, key: string) => key === 'production'
+    ? Number(seg(row, key).orders || 0) > 0
+    : Number(seg(row, key).skus || 0) > 0;
+
+  const cards: DashCard[] = [
+    {
+      id: 'kpi', title: '全链路概览', w: 12, h: 7,
+      content: <>
+        <div className="kpi-grid">
+          <div className="kpi"><div className="kpi-label">款号</div><div className="kpi-value">{fmt(data?.spuCount)}<small>款</small></div><div className="kpi-note">生产单 + 三仓观测去重</div></div>
+          <div className="kpi"><div className="kpi-label">在产数量</div><div className="kpi-value">{fmt(data?.productionQty)}<small>件</small></div><div className="kpi-note">新物云每单最新状态</div></div>
+          <div className="kpi"><div className="kpi-label">工厂仓可用</div><div className="kpi-value">{fmt(data?.factoryUsable)}<small>件</small></div><div className="kpi-note">供应链协同</div></div>
+          <div className="kpi"><div className="kpi-label">国内仓可用</div><div className="kpi-value">{fmt(data?.wmsUsable)}<small>件</small></div><div className="kpi-note">WMS 快照（较旧）</div></div>
+          <div className="kpi"><div className="kpi-label">平台仓可用</div><div className="kpi-value">{fmt(data?.fbaUsable)}<small>件</small></div><div className="kpi-note">FBA 可售</div></div>
+        </div>
+        <div className="notice-line">以款号为轴归并四段观测：生产单的货品编码、工厂库存的款号、WMS 与平台仓的 SKU 前缀都等于款号，所以不需要额外映射表。某一段没有数据时显示「未接入」，不显示 0。</div>
+      </>,
+    },
+    {
+      id: 'chain', title: '按款号看链路', w: 12, h: 18,
+      content: <div className="table-scroll"><table>
+        <thead><tr><th>款号</th><th>品名</th><th>链路</th><th>生产</th><th>工厂仓</th><th>国内仓</th><th>平台仓</th><th>SKU</th></tr></thead>
+        <tbody>{spus.map(r => {
+          const p = seg(r, 'production'), f = seg(r, 'factory'), w = seg(r, 'wms'), b = seg(r, 'fba');
+          const statuses = Object.entries((p.byStatus as Row) || {}).map(([k, v]) => `${k} ${fmt(v)}`).join(' · ');
+          return <tr key={String(r.spu)}>
+            <td><code>{String(r.spu)}</code></td>
+            <td title={String(r.goodsName || '')}>{String(r.goodsName || '—')}</td>
+            <td className="stages">
+              <Stage on={has(r, 'production')} text="生产" />
+              <Stage on={has(r, 'factory')} text="工厂" />
+              <Stage on={has(r, 'wms')} text="国内" />
+              <Stage on={has(r, 'fba')} text="平台" />
+            </td>
+            <td>{has(r, 'production') ? <>{fmt(p.orders)} 单 · {fmt(p.qty)} 件<small className="muted">{statuses}</small></> : <span className="muted">未接入</span>}</td>
+            <td>{has(r, 'factory') ? <>{fmt(f.usable)} / {fmt(f.total)}<small className="muted">占用 {fmt(f.occupied)}</small></> : <span className="muted">未接入</span>}</td>
+            <td>{has(r, 'wms') ? <>{fmt(w.usable)} / {fmt(w.total)}<small className="muted">冻结 {fmt(w.frozen)}</small></> : <span className="muted">未接入</span>}</td>
+            <td>{has(r, 'fba') ? <>{fmt(b.usable)} / {fmt(b.total)}<small className="muted">预留 {fmt(b.reserved)}</small></> : <span className="muted">未接入</span>}</td>
+            <td className="muted">{(r.skus as string[])?.length || 0}</td>
+          </tr>;
+        })}</tbody></table></div>,
+    },
+  ];
+
+  return <>
+    <Head title="SKU 全链路" chip="总览 · 生产 → 工厂仓 → 国内仓 → 平台仓（只读）" onRefresh={load} busy={busy} />
+    <DashBoard page="sku" cards={cards} notify={notify} />
+  </>;
+}
