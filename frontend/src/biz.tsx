@@ -1,6 +1,7 @@
 import type { Row } from './api';
 import { DashBoard, type DashCard } from './grid';
 import { Head, useInsight } from './insight';
+import { Stat, StatGrid } from './ui';
 import './insight.css';
 import './biz.css';
 
@@ -65,20 +66,20 @@ export function ProductionPage({ notify }: { notify: Notice }) {
 
   const cards: DashCard[] = [
     {
-      id: 'kpi', title: '生产概览', w: 12, h: 8,
+      id: 'kpi', title: '生产概览', w: 12, h: 7,
       content: <>
-        <div className="kpi-grid">
-          <div className="kpi"><div className="kpi-label">生产单</div><div className="kpi-value">{fmt(data?.orders)}<small>单</small></div><div className="kpi-note">按生产单号去重</div></div>
-          <div className="kpi"><div className="kpi-label">在产数量</div><div className="kpi-value">{fmt(data?.totalQty)}<small>件</small></div><div className="kpi-note">每单取最新状态数量</div></div>
-          <div className="kpi"><div className="kpi-label">原始事件</div><div className="kpi-value">{fmt(data?.events)}<small>条</small></div><div className="kpi-note">新物云生产订单观测</div></div>
-          <div className="kpi"><div className="kpi-label">数据截至</div><div className="kpi-value kpi-small">{when(data?.asOf)}</div><div className="kpi-note">首次可见 {when(data?.firstSeen)}</div></div>
-        </div>
+        <StatGrid>
+          <Stat label="生产单" value={fmt(data?.orders)} unit="单" note="按生产单号去重" />
+          <Stat label="在产数量" value={fmt(data?.totalQty)} unit="件" note="每单取最新状态数量" />
+          <Stat label="原始事件" value={fmt(data?.events)} unit="条" note="新物云生产订单观测" />
+          <Stat label="数据截至" value={<span className="kpi-small">{when(data?.asOf)}</span>} note={`首次可见 ${when(data?.firstSeen)}`} />
+        </StatGrid>
         <div className="notice-line">只读接入新物云生产订单，状态取每张生产单的最后一条事件。入库进度要等入库数据接入后才能与「数量」核对，现在不能直接当在途库存用。</div>
       </>,
     },
-    { id: 'status', title: '状态分布', w: 6, h: 6, content: byStatus.length ? <Dist items={byStatus} unit="件" /> : empty('暂无状态数据') },
-    { id: 'region', title: '按地区', w: 6, h: 6, content: byRegion.length ? <Dist items={byRegion} unit="件" /> : empty('暂无地区数据') },
-    { id: 'shop', title: '按店铺', w: 12, h: 6, content: byShop.length ? <Dist items={byShop} unit="件" /> : empty('暂无店铺数据') },
+    { id: 'status', title: '状态分布', w: 6, h: 4, content: byStatus.length ? <Dist items={byStatus} unit="件" /> : empty('暂无状态数据') },
+    { id: 'region', title: '按地区', w: 6, h: 4, content: byRegion.length ? <Dist items={byRegion} unit="件" /> : empty('暂无地区数据') },
+    { id: 'shop', title: '按店铺', w: 12, h: 4, content: byShop.length ? <Dist items={byShop} unit="件" /> : empty('暂无店铺数据') },
     {
       id: 'orders', title: '生产单明细', w: 12, h: 15,
       content: <div className="table-scroll"><table><thead><tr><th>生产单号</th><th>订单号</th><th>货品</th><th>数量</th><th>状态</th><th>店铺</th><th>地区</th><th>最后更新</th></tr></thead>
@@ -116,20 +117,22 @@ export function InventoryPage({ notify }: { notify: Notice }) {
       content: spec.available === false
         ? empty(`${title}数据集尚未登记，先在「数据接入」完成连接与采集。`)
         : <>
-          <div className="kpi-grid">
-            <div className="kpi"><div className="kpi-label">SKU</div><div className="kpi-value">{fmt(spec.skus)}<small>个</small></div><div className="kpi-note">{fmt(spec.events)} 条观测</div></div>
-            <div className={`kpi ${stale !== null && stale >= 7 ? 'kpi-warn' : ''}`}><div className="kpi-label">总库存</div><div className="kpi-value">{fmt(spec.total)}<small>件</small></div><div className="kpi-note">{staleNote(spec.as_of, '数据截至 ' + when(spec.as_of))}</div></div>
-            <div className="kpi kpi-ok"><div className="kpi-label">可用</div><div className="kpi-value">{fmt(spec.usable)}<small>件</small></div><div className="kpi-note">{num(spec.total) > 0 ? Math.round(num(spec.usable) / num(spec.total) * 100) : 0}% 可售</div></div>
+          <StatGrid>
+            <Stat label="SKU" value={fmt(spec.skus)} unit="个" note={`${fmt(spec.events)} 条观测`} />
+            <Stat label="总库存" value={fmt(spec.total)} unit="件" tone={stale !== null && stale >= 7 ? 'warn' : undefined}
+              note={staleNote(spec.as_of, '数据截至 ' + when(spec.as_of))} />
+            <Stat label="可用" value={fmt(spec.usable)} unit="件" tone="ok"
+              note={`${num(spec.total) > 0 ? Math.round(num(spec.usable) / num(spec.total) * 100) : 0}% 可售`} />
             {key === 'wms' && <>
-              <div className="kpi kpi-warn"><div className="kpi-label">冻结</div><div className="kpi-value">{fmt(spec.frozen)}<small>件</small></div></div>
-              <div className="kpi"><div className="kpi-label">库存金额</div><div className="kpi-value">¥{fmt(spec.amount)}</div><div className="kpi-note">stockMoney 汇总</div></div>
+              <Stat label="冻结" value={fmt(spec.frozen)} unit="件" tone="warn" />
+              <Stat label="库存金额" value={`¥${fmt(spec.amount)}`} note="stockMoney 汇总" />
             </>}
-            {key === 'factory' && <div className="kpi kpi-warn"><div className="kpi-label">占用</div><div className="kpi-value">{fmt(spec.occupied)}<small>件</small></div><div className="kpi-note">工厂已占用未发</div></div>}
+            {key === 'factory' && <Stat label="占用" value={fmt(spec.occupied)} unit="件" tone="warn" note="工厂已占用未发" />}
             {key === 'fba' && <>
-              <div className="kpi kpi-warn"><div className="kpi-label">不可用</div><div className="kpi-value">{fmt(spec.unable)}<small>件</small></div></div>
-              <div className="kpi"><div className="kpi-label">在途入库</div><div className="kpi-value">{fmt(spec.inbound)}<small>件</small></div><div className="kpi-note">处理中 + 已发货 + 接收中</div></div>
+              <Stat label="不可用" value={fmt(spec.unable)} unit="件" tone="warn" />
+              <Stat label="在途入库" value={fmt(spec.inbound)} unit="件" note="处理中 + 已发货 + 接收中" />
             </>}
-          </div>
+          </StatGrid>
           {stale !== null && stale >= 30 && <div className="notice-line">这批 {title} 观测已陈旧 {stale} 天，是接入联调时的历史快照；要作为经营口径使用，需要先补一次完整采集。</div>}
           <div className="table-scroll"><table><thead><tr>
             <th>SKU</th>{key === 'factory' ? <th>SPU / 工厂</th> : key === 'fba' ? <th>MSKU / 店铺</th> : <th>条码</th>}
@@ -174,13 +177,13 @@ export function SkuChainPage({ notify }: { notify: Notice }) {
     {
       id: 'kpi', title: '全链路概览', w: 12, h: 7,
       content: <>
-        <div className="kpi-grid">
-          <div className="kpi"><div className="kpi-label">款号</div><div className="kpi-value">{fmt(data?.spuCount)}<small>款</small></div><div className="kpi-note">生产单 + 三仓观测去重</div></div>
-          <div className="kpi"><div className="kpi-label">在产数量</div><div className="kpi-value">{fmt(data?.productionQty)}<small>件</small></div><div className="kpi-note">新物云每单最新状态</div></div>
-          <div className="kpi"><div className="kpi-label">工厂仓可用</div><div className="kpi-value">{fmt(data?.factoryUsable)}<small>件</small></div><div className="kpi-note">供应链协同</div></div>
-          <div className="kpi"><div className="kpi-label">国内仓可用</div><div className="kpi-value">{fmt(data?.wmsUsable)}<small>件</small></div><div className="kpi-note">WMS 快照（较旧）</div></div>
-          <div className="kpi"><div className="kpi-label">平台仓可用</div><div className="kpi-value">{fmt(data?.fbaUsable)}<small>件</small></div><div className="kpi-note">FBA 可售</div></div>
-        </div>
+        <StatGrid>
+          <Stat label="款号" value={fmt(data?.spuCount)} unit="款" note="生产单 + 三仓观测去重" />
+          <Stat label="在产数量" value={fmt(data?.productionQty)} unit="件" note="新物云每单最新状态" />
+          <Stat label="工厂仓可用" value={fmt(data?.factoryUsable)} unit="件" note="供应链协同" />
+          <Stat label="国内仓可用" value={fmt(data?.wmsUsable)} unit="件" tone="warn" note="WMS 快照（较旧）" />
+          <Stat label="平台仓可用" value={fmt(data?.fbaUsable)} unit="件" note="FBA 可售" />
+        </StatGrid>
         <div className="notice-line">以款号为轴归并四段观测：生产单的货品编码、工厂库存的款号、WMS 与平台仓的 SKU 前缀都等于款号，所以不需要额外映射表。某一段没有数据时显示「未接入」，不显示 0。品牌与部门取自 sell 主数据快照（2026-11-12），实时主数据源尚未接入。{data?.metaError ? `（主数据读取失败：${String(data.metaError)}）` : ''}</div>
       </>,
     },
