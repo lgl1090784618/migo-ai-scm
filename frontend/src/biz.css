@@ -1,0 +1,12 @@
+/* 业务页（生产 / 库存）：维度占比条与紧凑数值 */
+
+.dist { display: flex; flex-direction: column; gap: 9px; }
+.dist-row { display: grid; grid-template-columns: minmax(90px, 34%) 1fr auto; gap: 10px; align-items: center; font-size: 12.5px; }
+.dist-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3a4250; }
+.dist-track { height: 8px; border-radius: 6px; background: #eef0f4; overflow: hidden; }
+.dist-track span { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #4f7cf7, #7aa2ff); }
+.dist-value { color: #5b6472; white-space: nowrap; }
+.dist-value small { color: #8b93a1; margin-left: 2px; }
+.dist-value small.muted { color: #a3aab8; }
+
+.kpi-value.kpi-small { font-size: 19px; line-height: 1.45; letter-spacing: 0; }

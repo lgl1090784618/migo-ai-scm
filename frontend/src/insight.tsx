@@ -10,23 +10,23 @@ type Notice = (message: string, error?: boolean) => void;
 const stateText: Record<string, string> = { ACTIVE: '已启用', PAUSED: '已暂停', DRAFT: '待配置', COMPLETED: '已完成', COMPLETED_WITH_ERRORS: '含异常', FAILED: '失败', RETRY: '等待重试', RUNNING: '运行中', QUEUED: '排队中', SUCCEEDED: '成功', LIMIT_REACHED: '到达上限', CANCELLED: '已取消' };
 const tone = (state?: string) => state === 'ACTIVE' || state === 'COMPLETED' || state === 'SUCCEEDED' ? 'ok' : state === 'FAILED' ? 'bad' : state === 'COMPLETED_WITH_ERRORS' || state === 'LIMIT_REACHED' || state === 'PAUSED' ? 'warn' : 'idle';
 
-function useInsight(path: string, notify: Notice) {
+export function useInsight(path: string, notify: Notice) {
   const [data, setData] = useState<Row | null>(null), [busy, setBusy] = useState(true), [at, setAt] = useState<string>('');
   const load = () => { setBusy(true); api(path).then(d => { setData(d); setAt(new Date().toISOString()); }).catch(e => notify(e.message, true)).finally(() => setBusy(false)); };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
   return { data, busy, at, load };
 }
 
-function Head({ title, chip, onRefresh, busy }: { title: string, chip: string, onRefresh: () => void, busy: boolean }) {
+export function Head({ title, chip, onRefresh, busy }: { title: string, chip: string, onRefresh: () => void, busy: boolean }) {
   return <div className="page-heading"><div><div className="eyebrow">{chip}</div><h1>{title}</h1></div>
     <div className="heading-actions"><button className="button" onClick={onRefresh} disabled={busy}>{busy ? <LoaderCircle size={16} className="spin" /> : <RefreshCw size={16} />}刷新</button></div></div>;
 }
 
-function Kpi({ label, value, unit, note, tone: t }: { label: string, value: React.ReactNode, unit?: string, note?: string, tone?: string }) {
+export function Kpi({ label, value, unit, note, tone: t }: { label: string, value: React.ReactNode, unit?: string, note?: string, tone?: string }) {
   return <div className={`kpi ${t ? 'kpi-' + t : ''}`}><div className="kpi-label">{label}</div><div className="kpi-value">{value}{unit && <small>{unit}</small>}</div>{note && <div className="kpi-note">{note}</div>}</div>;
 }
 
-function Badge({ text, t }: { text: string, t?: string }) { return <span className={`pill ${t ? 'pill-' + t : ''}`}>{text}</span>; }
+export function Badge({ text, t }: { text: string, t?: string }) { return <span className={`pill ${t ? 'pill-' + t : ''}`}>{text}</span>; }
 
 /* ------------------------------ 经营总览 ------------------------------ */
 

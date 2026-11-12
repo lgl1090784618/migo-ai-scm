@@ -64,7 +64,7 @@ function stackLayout(items: Item[]): Item[] {
   });
 }
 
-export function DashBoard({ page, cards, notify }: { page: string, cards: DashCard[], notify: Notice }) {  const [layout, setLayout] = useState<Item[]>(() => defaultLayout(cards));
+export function DashBoard({ page, cards, notify, actions, pending }: { page: string, cards: DashCard[], notify: Notice, actions?: React.ReactNode, pending?: boolean }) {  const [layout, setLayout] = useState<Item[]>(() => defaultLayout(cards));
   const [templates, setTemplates] = useState<{ name: string, layout: Item[] }[]>([]);
   const [current, setCurrent] = useState(SYSTEM);
   const [editing, setEditing] = useState(false);
@@ -176,6 +176,7 @@ export function DashBoard({ page, cards, notify }: { page: string, cards: DashCa
         </select>}
       </div>
       <div className="dash-actions">
+        {actions}
         {editing ? <>
           <button className="button" disabled={busy} onClick={() => save(current === SYSTEM ? '我的布局' : current)}>{busy ? <LoaderCircle size={15} className="spin" /> : <Save size={15} />}保存</button>
           <button className="button ghost" disabled={busy} onClick={() => { const n = window.prompt('另存为模板名称', '我的布局'); if (n && n.trim()) save(n.trim()); }}>另存为</button>
