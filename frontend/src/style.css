@@ -405,7 +405,7 @@ input::placeholder, textarea::placeholder { color: #9dafc0; }
 .filter-right { margin-left: auto; display: flex; align-items: center; gap: var(--s2); }
 .state-filter { max-width: 180px; }
 .sub-toolbar { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; }
-.check-col { width: 42px; min-width: 42px; max-width: 42px; padding-right: 0; text-align: center; }
+.check-col { width: 1%; white-space: nowrap; padding-left: 16px; padding-right: 4px; text-align: left; }
 .table-scroll td.check-col input, .table-scroll th.check-col input { margin: 0; }
 .bulk-bar { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s4); background: var(--brand-50); border-radius: var(--r-md); font-size: 12.5px; color: var(--brand-700); }
 .client-form { display: grid; gap: var(--s4); }
