@@ -74,7 +74,7 @@ export function BusinessOverview({ navigate, notify }: { navigate: (id: string) 
       </div>
     },
     {
-      id: 'chain', title: '全局链路：市场 → 计划 → 生产 → 物流 → 库存 → 销售', h: 9, content: <>
+      id: 'chain', title: '全局链路：市场 → 计划 → 生产 → 物流 → 库存 → 销售', h: 7, content: <>
         <p className="dash-note">每段显示当前可用的真实观测行数；未接入段直接标注，不拿示例数字充数。</p>
         <div className="chain-grid">
           {segments.map(s => <button key={s.key} className={`chain-card tone-${s.value === '未接入' ? 'idle' : 'ok'}`} onClick={() => navigate(s.to)}>
